@@ -60,12 +60,15 @@ class Engine:
         progress("Загружаю ожидание имени…")
         SetLogLevel(-1)
         self.wake_model = Model(str(models / "vosk-model-small-ru-0.22"))
+        self.recognizer_factory = KaldiRecognizer
         self.wake = KaldiRecognizer(self.wake_model, 16000)
         self.wake.SetWords(True)
         self.vocabulary = "браузер, Джарвис, скриншот, громкость, телеграм, стим, иксбокс"
+        self.choosing = False
 
-    def set_vocabulary(self, text=""):
+    def set_vocabulary(self, text="", choosing=False):
         self.vocabulary = "браузер, Джарвис, скриншот, громкость, телеграм, стим, иксбокс, " + str(text)[:1500]
+        self.choosing = bool(choosing)
 
     def wake_boundary(self, pcm: bytes) -> int | None:
         final = self.wake.AcceptWaveform(pcm)
@@ -83,7 +86,10 @@ class Engine:
 
     def reset(self):
         self.vad.reset()
-        self.wake.Reset()
+        # Reset() keeps Vosk's timeline/adaptation across utterances, while Interaction
+        # starts its PCM counter at zero. A fresh decoder gives each session one origin.
+        self.wake = self.recognizer_factory(self.wake_model, 16000)
+        self.wake.SetWords(True)
 
     def transcribe(self, pcm: bytes) -> str:
         samples = np.frombuffer(pcm, dtype="<i2").astype(np.float32) / 32768
@@ -91,9 +97,11 @@ class Engine:
             samples,
             language="ru",
             beam_size=5,
+            temperature=0,
             condition_on_previous_text=False,
             vad_filter=False,
-            initial_prompt="Джарвис. Браузер. Открой. Запусти. Отмена.",
+            initial_prompt=("Выбор игры: первую, вторую, третью, четвертую, пятую, шестую, седьмую, восьмую, девятую, десятую. Вариант один. Вариант два. Отмена."
+                            if self.choosing else "Джарвис. Браузер. Открой. Запусти. Отмена."),
             hotwords=self.vocabulary,
             no_speech_threshold=0.6,
         )

@@ -17,6 +17,11 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private readonly SettingsStore _settingsStore;
     private readonly LaunchCatalogStore _catalogStore;
     private readonly SkillDispatcher _skills;
+    private readonly LaunchConversation _conversation = new();
+    private bool _voiceInteraction;
+    private bool _askingChoice;
+    public bool AwaitingChoice => _conversation.HasPending;
+    public event Action<string>? ClarificationReady;
     private List<LaunchTarget> _targets = [];
     private string? _artifactPath;
     public IReadOnlyList<LaunchTarget> Targets => _targets;
@@ -79,13 +84,13 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     public event Action? Initialized;
     public event Action<bool>? CycleCompleted;
 
-    public MainViewModel(string root)
+    public MainViewModel(string root, IReadOnlyList<LaunchTarget>? targets = null, SkillDispatcher? skills = null)
     {
         _root = root;
         _catalogStore = new(Path.Combine(root, "data", "apps.json"));
-        var catalog = _catalogStore.Load(); _targets = catalog.Targets;
+        var catalog = _catalogStore.Load(); _targets = targets?.ToList() ?? catalog.Targets;
         if (catalog.Warning != null) Log(catalog.Warning);
-        _skills = BuiltInSkills.Create(root, () => Targets);
+        _skills = skills ?? BuiltInSkills.Create(root, () => Targets);
         _settingsStore = new SettingsStore(Path.Combine(root, "data", "settings.json"));
         var loaded = _settingsStore.Load();
         _settings = loaded.Settings;
@@ -167,6 +172,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     public void Listen()
     {
         if (!CanListen) return;
+        _conversation.Clear(); _voiceInteraction = true; _askingChoice = false;
         var session = NewSession();
         _acceptTranscript = true;
         _resumeWake = WakeMode;
@@ -185,8 +191,10 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         catch (Exception ex) { Fail(ex.Message); }
     }
 
-    public void Stop()
+    public void Stop(bool keepChoice = false)
     {
+        if (!keepChoice) _conversation.Clear();
+        _askingChoice = false; _voiceInteraction = false;
         _acceptTranscript = false;
         _resumeWake = false;
         StopMicrophone();
@@ -203,6 +211,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     public async Task TestVoiceAsync(AssistantSettings? preview = null)
     {
         if (!Ready || Busy) return;
+        _conversation.Clear(); _askingChoice = false; _voiceInteraction = false;
         var session = NewSession();
         Busy = true;
         _lastVerified = false;
@@ -218,6 +227,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     public void ImportTestAudio(string path)
     {
         if (!Ready || Busy) return;
+        _conversation.Clear(); _askingChoice = false; _voiceInteraction = false;
         using var input = new WaveFileReader(path);
         if (input.WaveFormat.SampleRate != 16000 || input.WaveFormat.Channels != 1 || input.WaveFormat.BitsPerSample != 16)
             throw new InvalidDataException("Для теста нужен WAV PCM16 mono 16 kHz.");
@@ -274,8 +284,12 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
                 _deadline = DateTime.UtcNow.AddSeconds(45); break;
             case "empty":
                 StopMicrophone(); _acceptTranscript = false;
-                Phase = AssistantPhase.Idle; Status = "Речь не обнаружена. Попробуй ещё раз.";
-                Busy = false; _deadline = DateTime.MaxValue; CycleCompleted?.Invoke(false); break;
+                var wasChoosing = _conversation.HasPending;
+                _conversation.Clear();
+                Phase = AssistantPhase.Idle; Status = wasChoosing ? "Ответа не было. Выбор отменён." : "Речь не обнаружена. Попробуй ещё раз.";
+                Busy = false; _deadline = DateTime.MaxValue; CycleCompleted?.Invoke(false);
+                if (wasChoosing) await ResumeWakeAsync(session, token, 200);
+                break;
             case "transcript":
                 if (!_acceptTranscript) return;
                 _acceptTranscript = false;
@@ -285,10 +299,24 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
                 await ExecuteAsync(Transcript, session, token); break;
             case "speech":
                 Phase = AssistantPhase.Speaking; Status = "Можно остановить ответ кнопкой «Стоп».";
+                _deadline = DateTime.UtcNow.AddSeconds(90);
                 await _audio.PlayAsync(Convert.FromBase64String(message.GetProperty("wav").GetString()!), token, _replyVolume);
                 if (session != _session) return;
                 Busy = false; _deadline = DateTime.MaxValue;
                 Phase = AssistantPhase.Idle; Level = 0; Status = "Готов к следующей команде.";
+                if (_askingChoice && _conversation.HasPending)
+                {
+                    _askingChoice = false; _conversation.Renew(DateTimeOffset.UtcNow);
+                    if (_voiceInteraction)
+                    {
+                        // No microphone while TTS plays; a short tail delay prevents hearing our own question.
+                        Busy = true;
+                        await Task.Delay(700, token);
+                        if (session == _session) ListenForChoice();
+                    }
+                    else { Status = "Жду выбор через меню «Команда текстом»."; ClarificationReady?.Invoke(Reply); }
+                    break;
+                }
                 CycleCompleted?.Invoke(_lastVerified);
                 await ResumeWakeAsync(session, token, 700);
                 break;
@@ -302,19 +330,22 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
     public void SaveCatalog(IEnumerable<LaunchTarget> targets)
     {
+        _conversation.Clear();
         var updated = targets.ToList(); _catalogStore.Save(updated); _targets = updated;
         OnPropertyChanged(nameof(Targets)); Log($"Каталог сохранён · включено {_targets.Count(t => t.Enabled)}");
     }
     private string Vocabulary()
     {
         var enabled = Targets.Where(t => t.Enabled).ToArray();
-        return string.Join(", ", enabled.SelectMany(t => t.Aliases ?? []).Concat(enabled.Where(t => t.Kind == "steam").Select(t => t.Name))
-            .Concat(enabled.Select(t => t.Name)).Distinct().Take(80));
+        if (_conversation.HasPending)
+            enabled = enabled.Where(t => _conversation.CandidateIds.Contains(t.Id)).ToArray();
+        return LaunchVocabulary.Build(enabled, _conversation.HasPending);
     }
 
     public async Task RunTextAsync(string text)
     {
         if (!CanSpeak || string.IsNullOrWhiteSpace(text)) return;
+        _voiceInteraction = false;
         var session = NewSession(); Busy = true; _resumeWake = false; _acceptTranscript = false;
         Transcript = text.Trim(); Log("Команда текстом: " + Transcript);
         try { await ExecuteAsync(Transcript, session, _operation.Token); }
@@ -327,7 +358,15 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         Phase = AssistantPhase.Executing; Status = "Выполняю команду…";
         _deadline = DateTime.UtcNow.AddSeconds(30);
         ArtifactPath = null;
-        var result = await _skills.ExecuteAsync(CommandRouter.Resolve(text, Targets), token);
+        var turn = _conversation.Resolve(text, Targets, DateTimeOffset.UtcNow);
+        if (turn.NeedsAnswer)
+        {
+            _lastVerified = false; _askingChoice = true; Reply = turn.Question!; Log(Reply);
+            Phase = AssistantPhase.Synthesizing; Status = "Уточняю, что запустить…";
+            _deadline = DateTime.UtcNow.AddSeconds(30); Speak(session, Reply, Settings); return;
+        }
+        _askingChoice = false;
+        var result = await _skills.ExecuteAsync(turn.Command!, token);
         if (session != _session) return;
         _lastVerified = result.Verified; Reply = result.Message; ArtifactPath = result.ArtifactPath;
         Log(Reply);
@@ -347,6 +386,21 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         _replyVolume = (float)settings.Volume;
         Send(new { type = "synthesize", session, text, voice = settings.Voice,
             style = settings.VoiceStyle, amount = settings.RobotAmount, rate = settings.SpeechRate });
+    }
+
+    private void ListenForChoice()
+    {
+        if (!_conversation.HasPending || SelectedMicrophone == null)
+        { _conversation.Clear(); Busy = false; Status = "Для голосового выбора нужен микрофон. Повтори команду."; return; }
+        var session = NewSession(); _acceptTranscript = true; Busy = true;
+        Phase = AssistantPhase.Listening; Status = "Назови часть или вариант. Повторять «Джарвис» не нужно. Жду 10 секунд.";
+        _deadline = DateTime.UtcNow.AddSeconds(24);
+        try
+        {
+            Send(new { type = "start", session, mode = "command", wait_seconds = 10, vocabulary = Vocabulary(), choosing = true });
+            _audio.Start(SelectedMicrophone.Id); MicrophoneActive = true; Log("Слушаю уточнение");
+        }
+        catch (Exception ex) { Fail(ex.Message); }
     }
 
     private async Task ResumeWakeAsync(long session, CancellationToken token, int delay)

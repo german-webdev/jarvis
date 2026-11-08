@@ -84,7 +84,7 @@ public sealed class AudioService : IDisposable
         output.Init(meter.ToWaveProvider());
         output.Play();
         using var registration = token.Register(() => output.Stop());
-        try { await done.Task.WaitAsync(TimeSpan.FromSeconds(30), token); }
+        try { await done.Task.WaitAsync(TimeSpan.FromSeconds(Math.Clamp(reader.TotalTime.TotalSeconds + 5, 30, 85)), token); }
         finally { output.Stop(); PlaybackLevel?.Invoke(0); if (_player == output) _player = null; }
     }
 

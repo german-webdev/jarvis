@@ -62,7 +62,7 @@ public partial class MainWindow : Window
     { _viewModel.Stop(); new CatalogWindow(_viewModel) { Owner = this }.ShowDialog(); }
     private async void TextCommandClick(object sender, RoutedEventArgs e)
     {
-        _viewModel.Stop();
+        _viewModel.Stop(keepChoice: true);
         var dialog = new TextCommandWindow { Owner = this };
         if (dialog.ShowDialog() == true) await _viewModel.RunTextAsync(dialog.Command);
     }

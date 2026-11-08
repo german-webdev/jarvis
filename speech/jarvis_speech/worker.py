@@ -63,7 +63,7 @@ def main():
             if kind == "quit":
                 return 0
             if kind == "start":
-                engine.set_vocabulary(command.get("vocabulary", ""))
+                engine.set_vocabulary(command.get("vocabulary", ""), choosing=command.get("choosing", False))
                 session = int(incoming)
                 mode = command.get("mode", "command")
                 interaction.start(mode, float(command.get("wait_seconds", 8)))

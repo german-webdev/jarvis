@@ -27,7 +27,7 @@ public partial class CatalogWindow : Window
     {
         var entry = (CatalogEntry)item; var search = SearchBox.Text.Trim();
         if (SourceBox.SelectedIndex > 0 && entry.Source != (string)((ComboBoxItem)SourceBox.SelectedItem).Content) return false;
-        return search.Length == 0 || (entry.Name + " " + entry.Source + " " + entry.AliasesText).Contains(search, StringComparison.CurrentCultureIgnoreCase);
+        return search.Length == 0 || (entry.Name + " " + entry.Source + " " + entry.AliasesText + " " + entry.AutomaticText).Contains(search, StringComparison.CurrentCultureIgnoreCase);
     }
     private void SearchChanged(object sender, TextChangedEventArgs e) => _view?.Refresh();
     private void SourceChanged(object sender, SelectionChangedEventArgs e) => _view?.Refresh();
@@ -69,6 +69,7 @@ public sealed class CatalogEntry(LaunchTarget target)
     public LaunchTarget Target { get; } = target;
     public string Name => Target.Name;
     public string Source => Target.Source;
+    public string AutomaticText => string.Join("; ", Target.AutomaticAliases);
     public bool Enabled { get; set; } = target.Enabled;
     public string AliasesText { get; set; } = string.Join("; ", target.Aliases ?? []);
     public LaunchTarget Capture() => Target with { Enabled = Enabled, Aliases = AliasesText.Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Distinct(StringComparer.OrdinalIgnoreCase).Take(20).ToArray() };

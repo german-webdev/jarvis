@@ -33,7 +33,8 @@ def main():
     results = {}
     with (ROOT / "work" / "speech-test-stderr.log").open("w", encoding="utf-8") as errors:
         process = subprocess.Popen(
-            [sys.executable, "-u", "-m", "jarvis_speech.worker"],
+            # Piper uses ONNX random operators. Fix their seed for reproducible test audio.
+            [sys.executable, "-u", "-c", "import onnxruntime as ort; ort.set_seed(0); from jarvis_speech.worker import main; raise SystemExit(main())"],
             cwd=ROOT,
             env=env,
             stdin=subprocess.PIPE,
@@ -120,18 +121,32 @@ def main():
             stream(command_audio + bytes(32000), 7)
             results["paused_wake_transcript"] = expect("transcript")
             assert "браузер" in results["paused_wake_transcript"]["text"].lower()
-            send("start", session=8, mode="wake", wait_seconds=4)
-            expect("listening")
-            stream(name_audio + bytes(160000), 8)
-            expect("activated")
-            expect("command_timeout")
+            for session in range(20, 23):
+                send("start", session=session, mode="wake", wait_seconds=4)
+                expect("listening")
+                stream(name_audio + bytes(160000), session)
+                expect("activated")
+                expect("command_timeout")
             results["name_only_timeout"] = True
+            results["repeated_wake_sessions"] = 3
             for style in ["natural", "robot", "radio"]:
                 send("synthesize", session=9, text="Системы готовы. Слушаю ваши команды.", voice="denis", style=style)
                 voice_wav = base64.b64decode(expect("speech")["wav"])
                 assert len(voice_wav) > 1000
                 (ROOT / "work" / f"voice-denis-{style}.wav").write_bytes(voice_wav)
             results["denis_presets"] = ["natural", "robot", "radio"]
+            results["name_variants"] = []
+            for phrase, expected in [("Запусти сабнавтику.", "сабнавтику"), ("Шестую.", "шестую")]:
+                send("synthesize", session=10, text=phrase)
+                sample = pcm16k(base64.b64decode(expect("speech")["wav"]))
+                send("start", session=11, mode="command", wait_seconds=10,
+                     choosing=expected == "шестую",
+                     vocabulary="Subnautica, сабнавтика, сабнавтику, Forza Horizon 5, Forza Horizon 6, пятую, шестую, вариант два")
+                expect("listening")
+                stream(sample + bytes(32000), 11)
+                recognized = expect("transcript")
+                assert expected in recognized["text"].lower(), recognized
+                results["name_variants"].append(recognized)
             (ROOT / "work" / "speech-smoke.json").write_text(
                 json.dumps(results, indent=2, ensure_ascii=False), encoding="utf-8"
             )

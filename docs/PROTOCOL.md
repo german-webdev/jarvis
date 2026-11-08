@@ -4,7 +4,7 @@ UTF-8 JSON Lines через stdin/stdout; stdout содержит только J
 
 | Направление | type | Основные поля |
 |---|---|---|
-| C# → Python | start | session: integer, mode: command или wake, wait_seconds: 4–15, по умолчанию 8 |
+| C# → Python | start | session: integer, mode: command или wake, wait_seconds: 4–15, по умолчанию 8; vocabulary: подсказки до 1500 символов; choosing: boolean, контекст короткого ответа при выборе игры, по умолчанию false |
 | C# → Python | audio | session, pcm: Base64, PCM16 little-endian mono 16 kHz; пакет до 1 секунды |
 | C# → Python | cancel | session: новый номер; сбрасывает накопленный звук |
 | C# → Python | synthesize | session, text: до 500 символов; voice: dmitri/denis; style: natural/robot/radio; amount: 0–1; rate: 0.85–1.2 |

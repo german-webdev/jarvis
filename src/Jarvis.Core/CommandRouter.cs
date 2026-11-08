@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 namespace Jarvis.Core;
 
 public enum Intent { OpenBrowser, Cancel, Unknown, LaunchTarget, Screenshot, OpenScreenshots, VolumeUp, VolumeDown, SetVolume, Mute, Unmute, Time, Date, Help }
-public record CommandRequest(Intent Intent, string? TargetId = null, int? Value = null, string? Explanation = null);
+public record CommandRequest(Intent Intent, string? TargetId = null, int? Value = null, string? Explanation = null, string[]? CandidateIds = null);
 
 public static partial class CommandRouter
 {
@@ -41,7 +41,7 @@ public static partial class CommandRouter
         return matches.Length switch
         {
             1 => new(Intent.LaunchTarget, matches[0].Id),
-            > 1 => new(Intent.Unknown, Explanation: "Этому названию соответствуют несколько приложений. Задай разные голосовые названия в каталоге."),
+            > 1 => new(Intent.Unknown, Explanation: "Подходят несколько приложений.", CandidateIds: matches.Select(t => t.Id).ToArray()),
             _ => new(Intent.Unknown)
         };
     }

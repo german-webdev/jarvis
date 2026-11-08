@@ -84,6 +84,8 @@ public partial class MainWindow : Window
     { _viewModel.Stop(); new CatalogWindow(_viewModel) { Owner = this }.ShowDialog(); }
     private void SitesClick(object sender, RoutedEventArgs e)
     { _viewModel.Stop(); new SitesWindow(_viewModel) { Owner = this }.ShowDialog(); }
+    private void AiClick(object sender, RoutedEventArgs e)
+    { _startupListenPending = false; _viewModel.Stop(); new AiConnectionsWindow(_viewModel.Ai) { Owner = this }.ShowDialog(); }
     private async void TextCommandClick(object sender, RoutedEventArgs e)
     {
         _viewModel.Stop(keepChoice: true);

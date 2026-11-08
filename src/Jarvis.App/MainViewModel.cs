@@ -13,6 +13,7 @@ namespace Jarvis.App;
 public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 {
     private readonly string _root;
+    public AiService Ai { get; }
     private readonly AudioService _audio = new();
     private readonly SettingsStore _settingsStore;
     private readonly LaunchCatalogStore _catalogStore;
@@ -96,6 +97,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     public MainViewModel(string root, IReadOnlyList<LaunchTarget>? targets = null, SkillDispatcher? skills = null)
     {
         _root = root;
+        Ai = new AiService(root);
+        if (Ai.LoadWarning != null) Log(Ai.LoadWarning);
         Ui.Changed += RefreshLanguage;
         _catalogStore = new(Path.Combine(root, "data", "apps.json"));
         var catalog = _catalogStore.Load(); _targets = targets?.ToList() ?? catalog.Targets;
@@ -392,6 +395,14 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         Phase = AssistantPhase.Executing; Status = "Выполняю команду…";
         _deadline = DateTime.UtcNow.AddSeconds(30);
         ArtifactPath = null;
+        var explicitQuestion = AiRouting.ExplicitQuestion(text);
+        if (explicitQuestion != null)
+        {
+            _conversation.Clear(); _askingChoice = false;
+            await AnswerWithAiAsync(explicitQuestion, session, token);
+            return;
+        }
+        var wasChoosing = _conversation.HasPending;
         var preliminary = CommandRouter.Resolve(text, CommandTargets, musicTargetId: Settings.MusicTargetId);
         if (_conversation.ChoosingWindow || preliminary.Intent is Intent.CloseWindow or Intent.MinimizeWindow
             || preliminary.CandidateIntent is Intent.CloseTarget or Intent.FocusTarget)
@@ -404,6 +415,11 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             _deadline = DateTime.UtcNow.AddSeconds(30); Speak(session, Reply, Settings); return;
         }
         _askingChoice = false;
+        if (AiRouting.CanFallback(Ai.Configuration, turn.Command!, wasChoosing))
+        {
+            await AnswerWithAiAsync(text, session, token);
+            return;
+        }
         var result = await _skills.ExecuteAsync(turn.Command!, token);
         if (session != _session) return;
         _lastVerified = result.Verified; Reply = result.Message; ArtifactPath = result.ArtifactPath;
@@ -417,6 +433,27 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         }
         Phase = AssistantPhase.Synthesizing; Status = "Готовлю ответ…";
         _deadline = DateTime.UtcNow.AddSeconds(30); Speak(session, Reply, Settings);
+    }
+
+    private async Task AnswerWithAiAsync(string question, long session, CancellationToken token)
+    {
+        Status = "Жду ответ нейросети…";
+        _deadline = DateTime.UtcNow.AddSeconds(120);
+        var result = await Ai.AskAsync(question, token);
+        if (session != _session) return;
+        _lastVerified = result.Verified;
+        Reply = result.Message;
+        Log(Reply);
+        if (!_voiceInteraction)
+        {
+            Busy = false; _deadline = DateTime.MaxValue; Phase = AssistantPhase.Idle;
+            Status = "Готов. Ответ показан на экране.";
+            CycleCompleted?.Invoke(result.Verified);
+            return;
+        }
+        Phase = AssistantPhase.Synthesizing; Status = "Готовлю ответ…";
+        _deadline = DateTime.UtcNow.AddSeconds(90);
+        Speak(session, Reply, Settings);
     }
 
     private void Speak(long session, string text, AssistantSettings settings)
@@ -480,6 +517,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         if (_disposed) return;
         _disposed = true;
         Ui.Changed -= RefreshLanguage;
+        Ai.Dispose();
         _watchdog.Stop(); Stop(); _audio.Dispose();
         if (_worker != null) await _worker.DisposeAsync().ConfigureAwait(false);
         _operation.Dispose();

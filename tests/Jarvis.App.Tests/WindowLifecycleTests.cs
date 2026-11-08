@@ -33,6 +33,11 @@ public class WindowLifecycleTests
                     var runtime = Assert.IsType<MainViewModel>(window.DataContext);
                     Assert.False(runtime.MicrophoneActive);
                     Assert.Equal("Здесь появится ответ JARVIS", runtime.Reply);
+                    Assert.False(runtime.Ai.Configuration.Enabled);
+                    Assert.Empty(runtime.Ai.Configuration.Connections);
+                    Assert.False(File.Exists(Path.Combine(root, "data", "ai-connections.json")));
+                    Assert.False(Directory.Exists(Path.Combine(root, "data", "ai-sessions")));
+                    Assert.False((await runtime.Ai.AskAsync("тест", CancellationToken.None)).Verified);
 
                     runtime.ApplySettings(runtime.Settings with { InterfaceLanguage = "en" });
                     Assert.Equal("en", new Jarvis.Core.SettingsStore(Path.Combine(root, "data", "settings.json")).Load().Settings.InterfaceLanguage);
@@ -55,6 +60,33 @@ public class WindowLifecycleTests
                     var englishClose = new CloseChoiceWindow();
                     Assert.Equal(new[] { "Minimize to tray", "Exit application" }, Descendants(englishClose).OfType<Button>().Select(button => button.Content));
                     englishClose.Close();
+                    var aiWindow = new AiConnectionsWindow(runtime.Ai);
+                    Assert.Equal("AI connections · JARVIS", aiWindow.Title);
+                    Assert.False(((CheckBox)aiWindow.FindName("EnabledBox")).IsChecked);
+                    Assert.Empty(((ListBox)aiWindow.FindName("ConnectionsList")).Items);
+                    Descendants(aiWindow).OfType<Button>().Single(button => Equals(button.Content, "Add")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    ((TextBox)aiWindow.FindName("NameBox")).Text = "Fixture API";
+                    ((TextBox)aiWindow.FindName("EndpointBox")).Text = "https://example.test/v1";
+                    ((ComboBox)aiWindow.FindName("ModelBox")).Text = "fixture-model";
+                    ((PasswordBox)aiWindow.FindName("KeyBox")).Password = "fixture-not-a-real-key";
+                    ((Button)aiWindow.FindName("SaveButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    var savedConnection = Assert.Single(runtime.Ai.Configuration.Connections);
+                    Assert.False(runtime.Ai.Configuration.Enabled);
+                    Assert.Null(runtime.Ai.Configuration.Active);
+                    Assert.DoesNotContain("fixture-not-a-real-key", File.ReadAllText(Path.Combine(root, "data", "ai-connections.json")));
+                    Assert.NotEmpty(savedConnection.ProtectedApiKey);
+                    ((TextBox)aiWindow.FindName("EndpointBox")).Text = "https://different.example.test/v1";
+                    ((Button)aiWindow.FindName("SaveButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    Assert.Empty(Assert.Single(runtime.Ai.Configuration.Connections).ProtectedApiKey);
+                    ((CheckBox)aiWindow.FindName("EnabledBox")).IsChecked = true;
+                    ((ComboBox)aiWindow.FindName("ActiveBox")).SelectedValue = savedConnection.Id;
+                    ((Button)aiWindow.FindName("SaveButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    Assert.NotNull(runtime.Ai.Configuration.Active);
+                    ((CheckBox)aiWindow.FindName("EnabledBox")).IsChecked = false;
+                    ((Button)aiWindow.FindName("SaveButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    Assert.Null(runtime.Ai.Configuration.Active);
+                    Assert.False(Directory.Exists(Path.Combine(root, "data", "ai-sessions")));
+                    aiWindow.Close();
                     runtime.ApplySettings(runtime.Settings with { InterfaceLanguage = "ru" });
                     Assert.Equal("JARVIS · Помощник", window.Title);
 
@@ -111,6 +143,7 @@ public class WindowLifecycleTests
                     window?.EndWindowsSession();
                     application.Shutdown();
                     File.Delete(Path.Combine(root, "data", "settings.json"));
+                    File.Delete(Path.Combine(root, "data", "ai-connections.json"));
                     if (Directory.Exists(Path.Combine(root, "data"))) Directory.Delete(Path.Combine(root, "data"));
                     Directory.Delete(root);
                 }

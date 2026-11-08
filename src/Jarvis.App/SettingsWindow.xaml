@@ -57,9 +57,10 @@
         <TextBlock Text="{DynamicResource Ui8813171BCC39}" Style="{StaticResource Hint}"/>
         <TextBlock Text="{DynamicResource UiD8D79B0695EE}" Style="{StaticResource Label}"/><CheckBox Content="{DynamicResource UiC23F0B5C92A3}" IsChecked="{Binding ShowLog}" Foreground="#E5EEF6" Margin="0,8"/><CheckBox Content="{DynamicResource Ui92A8E45E91A6}" IsChecked="{Binding ReduceMotion}" Foreground="#E5EEF6" Margin="0,8"/>
         <TextBlock Text="{DynamicResource Ui34FE1F3912CE}" Style="{StaticResource Hint}"/>
+        <Button Content="{DynamicResource Ui4C41EB7DE0CE}" Click="AiClick" HorizontalAlignment="Left" Margin="0,18,0,0"/>
         <TextBlock Text="{DynamicResource UiDA4DA4E3527C}" Style="{StaticResource Label}"/><Button Content="{DynamicResource Ui64648201372F}" Click="RestartClick" HorizontalAlignment="Left" Margin="0,4,0,0"/>
         <TextBlock Text="{DynamicResource Ui9BE0D83D1E15}" Style="{StaticResource Hint}"/>
-        <TextBlock Text="{DynamicResource UiD9E94574684B}" Foreground="#69859E" FontSize="12" Margin="0,28,0,0"/>
+        <TextBlock Text="{DynamicResource Ui8917DB96E300}" Foreground="#69859E" FontSize="12" Margin="0,28,0,0"/>
       </StackPanel></ScrollViewer></TabItem>
     </TabControl>
     <TextBlock Grid.Row="2" Text="{Binding Runtime.Status}" Foreground="#91ACBF" FontSize="12" Margin="0,14,0,14" MinHeight="32"/>

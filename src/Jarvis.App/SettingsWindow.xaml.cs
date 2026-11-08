@@ -22,6 +22,7 @@ public partial class SettingsWindow : Window
     private void StopClick(object sender, RoutedEventArgs e) => _viewModel.Runtime.Stop();
     private void RefreshClick(object sender, RoutedEventArgs e) => _viewModel.Runtime.RefreshDevices();
     private async void RestartClick(object sender, RoutedEventArgs e) => await _viewModel.Runtime.RestartAsync();
+    private void AiClick(object sender, RoutedEventArgs e) => new AiConnectionsWindow(_viewModel.Runtime.Ai) { Owner = this }.ShowDialog();
     private void SaveClick(object sender, RoutedEventArgs e)
     {
         try

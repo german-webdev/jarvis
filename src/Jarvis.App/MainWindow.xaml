@@ -5,7 +5,7 @@
   <Grid>
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
     <Menu Background="#E8EDF3" Foreground="#17283A" Padding="12,2">
-      <MenuItem Header="_JARVIS"><MenuItem Header="{DynamicResource UiD256089CFB11}" Click="CatalogClick"/><MenuItem Header="{DynamicResource UiE3208DAB60D5}" Click="SitesClick"/><MenuItem Header="{DynamicResource Ui2707A626CCB8}" Click="TextCommandClick"/><Separator/><MenuItem Header="{DynamicResource Ui10E2EB774905}" InputGestureText="Ctrl+," Click="SettingsClick"/><Separator/><MenuItem Header="{DynamicResource Ui75CD24C315D4}" Click="ExitClick"/></MenuItem>
+      <MenuItem Header="_JARVIS"><MenuItem Header="{DynamicResource Ui93D2C77B62F0}" Click="AiClick"/><MenuItem Header="{DynamicResource UiD256089CFB11}" Click="CatalogClick"/><MenuItem Header="{DynamicResource UiE3208DAB60D5}" Click="SitesClick"/><MenuItem Header="{DynamicResource Ui2707A626CCB8}" Click="TextCommandClick"/><Separator/><MenuItem Header="{DynamicResource Ui10E2EB774905}" InputGestureText="Ctrl+," Click="SettingsClick"/><Separator/><MenuItem Header="{DynamicResource Ui75CD24C315D4}" Click="ExitClick"/></MenuItem>
       <MenuItem Header="{DynamicResource UiCD28723054D6}"><MenuItem Header="{DynamicResource UiF5B284F9340F}" IsCheckable="True" IsChecked="{Binding ShowLog}"/><MenuItem Header="{DynamicResource UiFAFD0C22168C}" Click="ClearHistoryClick"/></MenuItem>
       <MenuItem Header="{DynamicResource UiACD21466C1DF}"><MenuItem Header="{DynamicResource Ui863773C75A11}" Click="HelpClick"/></MenuItem>
     </Menu>

@@ -374,5 +374,8 @@
   "Следующей команды нет. Жду имя «Джарвис».": "No follow-up command. Waiting for “Jarvis”.",
   "Слушаю следующую команду 5 секунд — без имени «Джарвис».": "Listening for another command for 5 seconds — no “Jarvis” needed.",
   "Не удалось воспроизвести сигнал готовности.": "Could not play the ready sound.",
-  "JARVIS 0.9.2 · локальный голосовой помощник": "JARVIS 0.9.2 · local voice assistant"
+  "JARVIS 0.9.2 · локальный голосовой помощник": "JARVIS 0.9.2 · local voice assistant",
+  "В режиме ожидания сначала скажи «Джарвис», дождись готовности и произнеси команду. Команды ниже — на русском. Вместо [название] произнеси название из своего каталога; скобки произносить не нужно.": "In wake mode, say “Jarvis”, wait for the cue, then give a command. Commands below are in Russian. Replace [название] with a name from your catalog; do not say the brackets.",
+  "Запускай программы, мессенджеры и установленные игры по названию из каталога.": "Launch apps, messengers and installed games by their catalog names.",
+  "При закрытии приложение может предложить сохранить файл или уйти в трей. Для переключения или закрытия по названию его окно должно быть открыто.": "An app may ask you to save a file or minimize to its tray when closed. To switch to or close an app by name, its window must be open."
 }

@@ -3,14 +3,14 @@ using System.Text.RegularExpressions;
 namespace Jarvis.Core;
 
 public enum Intent { OpenBrowser, Cancel, Unknown, LaunchTarget, Screenshot, OpenScreenshots, VolumeUp, VolumeDown, SetVolume, Mute, Unmute, Time, Date, Help,
-    CloseTarget, FocusTarget, MinimizeWindow, CloseWindow, OpenTargetFolder, MediaPause, MediaPlay, MediaNext, MediaPrevious }
+    CloseTarget, FocusTarget, MinimizeWindow, CloseWindow, OpenTargetFolder, MediaPause, MediaPlay, MediaNext, MediaPrevious, StartMusic }
 public record CommandRequest(Intent Intent, string? TargetId = null, int? Value = null, string? Explanation = null, string[]? CandidateIds = null, Intent? CandidateIntent = null);
 
 public static partial class CommandRouter
 {
     public static Intent Parse(string text) => Resolve(text).Intent;
     public static string Normalize(string text) => Spaces().Replace(Punctuation().Replace(text.ToLowerInvariant().Replace('ё', 'е'), " "), " ").Trim();
-    public static CommandRequest Resolve(string text, IEnumerable<LaunchTarget>? targets = null, IEnumerable<LaunchTarget>? running = null)
+    public static CommandRequest Resolve(string text, IEnumerable<LaunchTarget>? targets = null, IEnumerable<LaunchTarget>? running = null, string? musicTargetId = null)
     {
         if (text.Length > 500 || Regex.IsMatch(text, @"[-−]\s*\d")) return new(Intent.Unknown);
         var phrase = WakePrefix().Replace(Normalize(text), "");
@@ -18,6 +18,15 @@ public static partial class CommandRouter
         if (text.Contains('?') && phrase is not ("сколько времени" or "который час" or "какое сегодня число" or "что ты умеешь")) return new(Intent.Unknown);
         if (phrase is "отмена" or "отмени" or "стоп") return new(Intent.Cancel);
         if (OpenPhrase().IsMatch(phrase)) return new(Intent.OpenBrowser);
+        if (phrase is "включи музыку" or "запусти музыку" or "давай музыку")
+        {
+            var music = (targets ?? []).Where(t => t.Enabled && (t.Id == musicTargetId || MusicSelection.IsMusicApp(t))).ToArray();
+            var preferred = music.FirstOrDefault(t => t.Id == musicTargetId);
+            if (preferred != null) return new(Intent.StartMusic, preferred.Id);
+            return music.Length switch { 1 => new(Intent.StartMusic, music[0].Id),
+                > 1 => new(Intent.Unknown, CandidateIds: music.Select(t => t.Id).ToArray(), CandidateIntent: Intent.StartMusic),
+                _ => new(Intent.Unknown, Explanation: "Музыкальное приложение не найдено. Выбери его в настройках музыки.", CandidateIntent: Intent.StartMusic) };
+        }
         var simple = phrase switch
         {
             "сделай скриншот" or "сделай снимок экрана" or "сними экран" => Intent.Screenshot,
@@ -31,8 +40,8 @@ public static partial class CommandRouter
             "что ты умеешь" or "покажи команды" or "список команд" => Intent.Help,
             "пауза" or "поставь на паузу" or "приостанови воспроизведение" => Intent.MediaPause,
             "продолжи" or "продолжи воспроизведение" or "возобнови воспроизведение" or "сними с паузы" => Intent.MediaPlay,
-            "следующий трек" or "следующая песня" or "включи следующий трек" => Intent.MediaNext,
-            "предыдущий трек" or "предыдущая песня" or "включи предыдущий трек" => Intent.MediaPrevious,
+            "следующий трек" or "следующая песня" or "включи следующий трек" or "дальше" or "следующий" or "следующая" => Intent.MediaNext,
+            "предыдущий трек" or "предыдущая песня" or "включи предыдущий трек" or "назад" or "предыдущий" or "предыдущая" => Intent.MediaPrevious,
             "сверни окно" or "сверни текущее окно" or "сверни активное окно" => Intent.MinimizeWindow,
             "закрой окно" or "закрой текущее окно" or "закрой активное окно" or "закрой текущее приложение" => Intent.CloseWindow,
             _ => Intent.Unknown
@@ -53,7 +62,15 @@ public static partial class CommandRouter
     }
     private static CommandRequest MatchTarget(string name, IEnumerable<LaunchTarget>? targets, Intent intent, string? missing = null)
     {
-        var matches = (targets ?? []).Where(t => t.Enabled && t.Names.Any(n => Normalize(n) == name)).DistinctBy(t => t.Id).ToArray();
+        var enabled = (targets ?? []).Where(t => t.Enabled).ToArray();
+        var matches = enabled.Where(t => t.Names.Any(n => Normalize(n) == name)).DistinctBy(t => t.Id).ToArray();
+        // Known acoustic collision reported by the user. Ask instead of starting a game on "Word".
+        if (intent == Intent.LaunchTarget && name is "ворд" or "уорд" or "word" or "ward" or "wardo" or "вордо" or "wardogs" or "вардогс" or "вордогс" or "war dogs")
+        {
+            var word = enabled.Where(t => Regex.IsMatch(Normalize(t.Name), @"^(?:microsoft |office )?word(?: \d{4})?$")).ToArray();
+            var games = enabled.Where(t => Normalize(t.Name) == "wardogs").ToArray();
+            if (word.Length > 0 && games.Length > 0) matches = word.Concat(games).DistinctBy(t => t.Id).ToArray();
+        }
         return matches.Length switch
         {
             1 => new(intent, matches[0].Id),

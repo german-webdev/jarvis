@@ -5,14 +5,6 @@ namespace Jarvis.App.Services;
 
 public static class MediaControl
 {
-    public static async Task<SkillResult> ExecuteAsync(CommandRequest request, CancellationToken token)
-    {
-        var manager = await GlobalSystemMediaTransportControlsSessionManager.RequestAsync().AsTask(token);
-        var session = manager.GetCurrentSession();
-        if (session == null) return new(false, "Активного плеера не нашёл. Сначала включи музыку или видео.");
-        return await ApplyAsync(session, request.Intent, token);
-    }
-
     public static async Task<SkillResult> ApplyAsync(GlobalSystemMediaTransportControlsSession session, Intent intent, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();

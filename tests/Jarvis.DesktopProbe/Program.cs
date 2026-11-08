@@ -23,6 +23,16 @@ public static class Program
     {
         if (args.Length < 1) return 2;
         string root = Path.GetFullPath(args[0]);
+        if (args.Contains("--verify-yandex")) return VerifyYandex(root).GetAwaiter().GetResult();
+        if (args.Contains("--inspect-media"))
+        {
+            var manager = GlobalSystemMediaTransportControlsSessionManager.RequestAsync().AsTask().GetAwaiter().GetResult();
+            var sessions = manager.GetSessions().Select(s => new { source = s.SourceAppUserModelId, status = s.GetPlaybackInfo().PlaybackStatus.ToString(),
+                pause = s.GetPlaybackInfo().Controls.IsPauseEnabled, play = s.GetPlaybackInfo().Controls.IsPlayEnabled,
+                next = s.GetPlaybackInfo().Controls.IsNextEnabled, previous = s.GetPlaybackInfo().Controls.IsPreviousEnabled }).ToArray();
+            File.WriteAllText(Path.Combine(root, "work", "media-inspection.json"), JsonSerializer.Serialize(new { current = manager.GetCurrentSession()?.SourceAppUserModelId, sessions }, new JsonSerializerOptions { WriteIndented = true }));
+            return 0;
+        }
         SetCurrentProcessExplicitAppUserModelID("Jarvis.DesktopProbe");
         var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
         if (args.Contains("--fixture"))
@@ -134,5 +144,55 @@ public static class Program
             }
         };
         app.Run(); return exit;
+    }
+    private static async Task<int> VerifyYandex(string root)
+    {
+        var report = new Dictionary<string, object?>();
+        GlobalSystemMediaTransportControlsSession? yandex = null;
+        bool wasPlaying = false;
+        int exit = 1;
+        try
+        {
+            var catalog = new LaunchCatalogStore(Path.Combine(root, "data", "apps.json")).Load().Targets;
+            var index = await AppLocations.ExecutablesAsync(default);
+            report["registered_executables"] = catalog.Where(t => t.Name is "Яндекс Музыка" or "Kaspersky Password Manager" or "Word" or "Excel")
+                .Select(t => new { t.Name, executable = index.GetValueOrDefault(t.Target), custom = NameVariants.SplitCustom(t.Aliases).ToArray() }).ToArray();
+            var manager = await GlobalSystemMediaTransportControlsSessionManager.RequestAsync();
+            var before = manager.GetSessions().ToArray();
+            yandex = before.Single(s => s.SourceAppUserModelId == "ru.yandex.desktop.music");
+            wasPlaying = yandex.GetPlaybackInfo().PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
+            var chrome = before.FirstOrDefault(s => s.SourceAppUserModelId == "Chrome");
+            var chromeBefore = chrome?.GetPlaybackInfo().PlaybackStatus;
+            string? preferred = null;
+            var music = new MusicPlayback(() => catalog, () => preferred, id => preferred = id);
+            var selected = MusicSelection.Choose(before.Select(s => MusicPlayback.Describe(s, catalog)).ToArray(), catalog, null);
+            report["selected_source"] = selected.SourceId;
+            if (selected.SourceId != "ru.yandex.desktop.music") throw new Exception("Yandex was not selected over browser");
+            var paused = await music.ExecuteAsync(new(Intent.MediaPause), default);
+            report["pause"] = paused;
+            var dialog = new LaunchConversation();
+            var turn = dialog.Resolve("Включи музыку", catalog, DateTimeOffset.UtcNow);
+            report["music_question"] = turn.Question;
+            var command = turn.NeedsAnswer ? dialog.Resolve("Яндекс Музыку", catalog, DateTimeOffset.UtcNow).Command! : turn.Command!;
+            if (command.Intent != Intent.StartMusic) throw new Exception("Music choice did not resolve");
+            var played = await music.StartAsync(command, default); report["play"] = played;
+            bool chromeUnchanged = chrome?.GetPlaybackInfo().PlaybackStatus == chromeBefore;
+            report["chrome_unchanged"] = chromeUnchanged;
+            var windows = new WindowControl();
+            var snapshot = await windows.CaptureAsync(catalog, default);
+            var window = snapshot.Single(t => t.Name == "Яндекс Музыка");
+            var focused = await windows.ExecuteAsync(new(Intent.FocusTarget, window.Id), default);
+            report["focus_yandex"] = focused;
+            report["remembered_music"] = preferred;
+            report["success"] = paused.Verified && played.Verified && chromeUnchanged && focused.Verified;
+            exit = Equals(report["success"], true) ? 0 : 1;
+        }
+        catch (Exception error) { report["error"] = error.ToString(); }
+        finally
+        {
+            if (yandex != null) { try { await MediaControl.ApplyAsync(yandex, wasPlaying ? Intent.MediaPlay : Intent.MediaPause, default); } catch { } }
+            File.WriteAllText(Path.Combine(root, "work", "yandex-verification.json"), JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true }));
+        }
+        return exit;
     }
 }

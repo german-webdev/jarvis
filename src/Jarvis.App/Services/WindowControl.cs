@@ -10,6 +10,18 @@ public sealed class WindowControl
 {
     private sealed record Entry(LaunchTarget Target, nint Handle, int Pid, long Started);
     private Dictionary<string, Entry> _entries = [];
+    private IReadOnlyDictionary<string, string> _executables = new Dictionary<string, string>();
+    private DateTime _pathsUpdated;
+    public async Task<IReadOnlyList<LaunchTarget>> CaptureAsync(IReadOnlyList<LaunchTarget> catalog, CancellationToken token)
+    {
+        if (DateTime.UtcNow - _pathsUpdated > TimeSpan.FromSeconds(30))
+        {
+            _pathsUpdated = DateTime.UtcNow;
+            try { _executables = await AppLocations.ExecutablesAsync(token); }
+            catch (TimeoutException) { } // Keep known identities; a slow shell must not disable all voice commands.
+        }
+        return Capture(catalog);
+    }
     private static readonly HashSet<string> Excluded = new(StringComparer.OrdinalIgnoreCase)
         { "System", "Idle", "dwm", "winlogon", "csrss", "lsass", "services", "sihost", "ShellExperienceHost", "StartMenuExperienceHost", "SearchHost" };
 
@@ -39,6 +51,7 @@ public sealed class WindowControl
                 var matched = catalog.Where(t => t.Enabled && (
                     t.Kind == "exe" && SamePath(t.Target, executable)
                     || t.Kind == "app" && appId != null && t.Target == appId
+                    || t.Kind == "app" && _executables.TryGetValue(t.Target, out var registered) && SamePath(registered, executable)
                     || t.Kind == "steam" && steam.Any(s => s.Target == t.Target && Inside(executable, s.InstallDirectory))
                     || t.Kind == "app" && KnownProcess(t.Name, process.ProcessName))).ToArray();
                 var primary = matched.FirstOrDefault();
@@ -87,6 +100,8 @@ public sealed class WindowControl
             if (IsIconic(entry.Handle)) ShowWindowAsync(entry.Handle, 9);
             SetForegroundWindow(entry.Handle);
             await Task.Delay(200, token);
+            if (GetForegroundWindow() != entry.Handle && Current(entry))
+                await WindowFocus.TryAsync(entry.Handle, entry.Pid, entry.Started, token);
             return GetForegroundWindow() == entry.Handle ? new(true, $"Переключился на {entry.Target.Name}.")
                 : new(false, "Windows не разрешила перевести окно на передний план. Выбери его на панели задач.");
         }

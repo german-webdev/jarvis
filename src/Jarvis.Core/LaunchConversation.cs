@@ -20,9 +20,9 @@ public sealed class LaunchConversation
     public void Clear() { _ids = []; _retries = 0; }
     public void Renew(DateTimeOffset now) { if (HasPending) _expires = now.AddSeconds(30); }
 
-    public ConversationTurn Resolve(string text, IReadOnlyList<LaunchTarget> targets, DateTimeOffset now, IReadOnlyList<LaunchTarget>? running = null)
+    public ConversationTurn Resolve(string text, IReadOnlyList<LaunchTarget> targets, DateTimeOffset now, IReadOnlyList<LaunchTarget>? running = null, string? musicTargetId = null)
     {
-        var request = CommandRouter.Resolve(text, targets, running);
+        var request = CommandRouter.Resolve(text, targets, running, musicTargetId);
         var answer = CommandRouter.Normalize(text);
         answer = Regex.Replace(answer, @"^(?:джарвис|jarvis) | пожалуйста$", "");
         if (request.Intent == Intent.Cancel || answer is "нет" or "не надо" or "ничего") { Clear(); return new(new(Intent.Cancel)); }
@@ -74,7 +74,7 @@ public sealed class LaunchConversation
             if (duplicate) label += " (" + source[..Math.Min(source.Length, 12)] + ")";
             return $"Вариант {i + 1}: {label}.";
         });
-        var question = _intent switch { Intent.CloseTarget => "Что закрыть? ", Intent.FocusTarget => "На какое окно переключиться? ", Intent.OpenTargetFolder => "Папку какой программы открыть? ", _ => "Что запустить? " };
+        var question = _intent switch { Intent.StartMusic => "Где включить музыку? ", Intent.CloseTarget => "Что закрыть? ", Intent.FocusTarget => "На какое окно переключиться? ", Intent.OpenTargetFolder => "Папку какой программы открыть? ", _ => "Что запустить? " };
         return question + string.Join(" ", choices) + " Назови часть, полное название или номер варианта. Для отмены скажи: отмена.";
     }
 }

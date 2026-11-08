@@ -8,6 +8,42 @@ namespace Jarvis.App.Services;
 
 public static class AppLocations
 {
+    public static Task<IReadOnlyDictionary<string, string>> ExecutablesAsync(CancellationToken token)
+    {
+        var completion = new TaskCompletionSource<IReadOnlyDictionary<string, string>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var thread = new Thread(() =>
+        {
+            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            object? shell = null, folder = null, items = null;
+            try
+            {
+                shell = Activator.CreateInstance(Type.GetTypeFromProgID("Shell.Application")!);
+                folder = ((dynamic)shell!).NameSpace("shell:::{4234d49b-0245-4df3-b780-3893943456e1}");
+                items = ((dynamic)folder!).Items();
+                for (int i = 0; i < (int)((dynamic)items).Count && !token.IsCancellationRequested; i++)
+                {
+                    object? item = null;
+                    try
+                    {
+                        item = ((dynamic)items).Item(i);
+                        string id = ((dynamic)item).Path;
+                        string? path = ((dynamic)item).ExtendedProperty("System.Link.TargetParsingPath") as string;
+                        if (!string.IsNullOrWhiteSpace(path) && Path.IsPathFullyQualified(path) && File.Exists(path) && Path.GetExtension(path).Equals(".exe", StringComparison.OrdinalIgnoreCase)) result[id] = Path.GetFullPath(path);
+                    }
+                    catch { }
+                    finally { if (item != null && Marshal.IsComObject(item)) Marshal.ReleaseComObject(item); }
+                }
+            }
+            catch { }
+            finally
+            {
+                foreach (var value in new[] { items, folder, shell }) if (value != null && Marshal.IsComObject(value)) Marshal.ReleaseComObject(value);
+                completion.TrySetResult(result);
+            }
+        }) { IsBackground = true, Name = "JARVIS executable index" };
+        thread.SetApartmentState(ApartmentState.STA); thread.Start();
+        return completion.Task.WaitAsync(TimeSpan.FromSeconds(6), token);
+    }
     public static async Task<string?> ResolveAsync(LaunchTarget target, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();

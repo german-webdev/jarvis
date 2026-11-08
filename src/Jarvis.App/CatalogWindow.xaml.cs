@@ -72,5 +72,5 @@ public sealed class CatalogEntry(LaunchTarget target)
     public string AutomaticText => string.Join("; ", Target.AutomaticAliases);
     public bool Enabled { get; set; } = target.Enabled;
     public string AliasesText { get; set; } = string.Join("; ", target.Aliases ?? []);
-    public LaunchTarget Capture() => Target with { Enabled = Enabled, Aliases = AliasesText.Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Distinct(StringComparer.OrdinalIgnoreCase).Take(20).ToArray() };
+    public LaunchTarget Capture() => Target with { Enabled = Enabled, Aliases = NameVariants.SplitCustom([AliasesText]).Take(20).ToArray() };
 }

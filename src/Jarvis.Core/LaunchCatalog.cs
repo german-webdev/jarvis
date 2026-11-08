@@ -7,7 +7,7 @@ namespace Jarvis.Core;
 public sealed record LaunchTarget(string Id, string Name, string Kind, string Target, string Source, string[] Aliases, bool Enabled = false, string? InstallDirectory = null)
 {
     [JsonIgnore] public string[] AutomaticAliases => NameVariants.Automatic(Name);
-    [JsonIgnore] public IEnumerable<string> Names => new[] { Name }.Concat(AutomaticAliases).Concat((Aliases ?? []).SelectMany(NameVariants.Expand)).Distinct();
+    [JsonIgnore] public IEnumerable<string> Names => new[] { Name }.Concat(AutomaticAliases).Concat(NameVariants.SplitCustom(Aliases).SelectMany(NameVariants.Expand)).Distinct();
     [JsonIgnore] public bool IsValid => !string.IsNullOrWhiteSpace(Id) && !string.IsNullOrWhiteSpace(Name) && Name.Length <= 150
         && (Aliases == null || Aliases.Length <= 20 && Aliases.All(a => a != null && a.Length <= 100))
         && !string.IsNullOrWhiteSpace(Target) && Target.Length <= 2048 && (Kind switch

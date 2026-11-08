@@ -11,6 +11,7 @@ public partial class App : Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        if (e.Args.FirstOrDefault() == "--focus-window") { Shutdown(WindowFocus.Run(e.Args)); return; }
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory != null && !File.Exists(Path.Combine(directory.FullName, "pyproject.toml"))) directory = directory.Parent;
         if (directory == null) { MessageBox.Show("Не найдена папка проекта. Запускай Джарвис через Start-Jarvis.cmd."); Shutdown(1); return; }

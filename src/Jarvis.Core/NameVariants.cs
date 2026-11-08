@@ -6,6 +6,8 @@ namespace Jarvis.Core;
 /// <summary>Local, bounded naming rules. Never guess a target by edit distance.</summary>
 public static class NameVariants
 {
+    public static IEnumerable<string> SplitCustom(IEnumerable<string>? aliases) => (aliases ?? [])
+        .SelectMany(a => a.Split([';', ',', '\r', '\n'], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)).Distinct(StringComparer.OrdinalIgnoreCase);
     private sealed record Family(string Pattern, string[] Names);
     private static readonly Family[] Families =
     [
@@ -22,7 +24,9 @@ public static class NameVariants
         new(@"^battlefield(?: |$)", ["батлфилд", "баттлфилд", "батла", "battlefield"]),
         new(@"^telegram$", ["телеграм", "телеграмм", "телега"]),
         new(@"^steam$", ["стим"]),
-        new(@"^xbox$", ["иксбокс", "икс бокс", "эксбокс"])
+        new(@"^xbox$", ["иксбокс", "икс бокс", "эксбокс"]),
+        new(@"^(?:microsoft |office )?word(?: \d{4})?$", ["ворд", "уорд", "word", "ward", "wardo", "вордо"]),
+        new(@"^(?:microsoft |office )?excel(?: \d{4})?$", ["эксель", "экссель", "экзель", "excel"])
     ];
     private static readonly string[] Cardinals = ["ноль", "один", "два", "три", "четыре", "пять", "шесть", "семь", "восемь", "девять", "десять", "одиннадцать", "двенадцать", "тринадцать", "четырнадцать", "пятнадцать", "шестнадцать", "семнадцать", "восемнадцать", "девятнадцать", "двадцать"];
     private static readonly string[] Ordinals = ["", "первую", "вторую", "третью", "четвертую", "пятую", "шестую", "седьмую", "восьмую", "девятую", "десятую"];
@@ -44,6 +48,7 @@ public static class NameVariants
             }
         }
         if (Regex.IsMatch(numbered, "[a-z]")) seeds.Add(Transliterate(numbered));
+        seeds.AddRange(Pronunciations(numbered));
         return seeds.SelectMany(Expand).Select(CommandRouter.Normalize).Where(s => s.Length > 1 && s.Length <= 150 && s != normalized)
             .Distinct(StringComparer.Ordinal).Take(100).ToArray();
     }
@@ -53,17 +58,36 @@ public static class NameVariants
         var normalized = NormalizeNumbers(CommandRouter.Normalize(text));
         yield return normalized;
         var tokens = normalized.Split(' ');
-        // Only simple Russian names and names followed by a part number are inflected.
-        if ((tokens.Length == 1 || tokens.Length == 2 && int.TryParse(tokens[1], out _)) && Regex.IsMatch(tokens[0], @"^[а-я]+а$"))
+        // Inflect the final Russian word, preserving brand words and a trailing part number.
+        int last = tokens.Length - 1;
+        if (last > 0 && int.TryParse(tokens[last], out _)) last--;
+        var word = tokens[last];
+        string Replace(string form) => string.Join(" ", tokens.Select((t, i) => i == last ? form : t));
+        if (Regex.IsMatch(word, @"^[а-я]+а$"))
         {
-            var inflected = tokens[0][..^1] + "у" + (tokens.Length == 2 ? " " + tokens[1] : "");
+            var inflected = Replace(word[..^1] + "у");
             yield return inflected;
             yield return SpokenNumbers(inflected);
-            yield return tokens[0][..^1] + (Regex.IsMatch(tokens[0], @"[кгхжчшщ]а$") ? "и" : "ы") + (tokens.Length == 2 ? " " + tokens[1] : "");
-            yield return tokens[0][..^1] + "ой" + (tokens.Length == 2 ? " " + tokens[1] : "");
+            yield return Replace(word[..^1] + (Regex.IsMatch(word, @"[кгхжчшщ]а$") ? "и" : "ы"));
+            yield return Replace(word[..^1] + "ой");
         }
-        if (tokens.Length == 1 && Regex.IsMatch(normalized, @"^[а-я]+[бвгджзклмнпрстфхцчшщ]$")) { yield return normalized + "а"; yield return normalized + "ом"; }
+        if (Regex.IsMatch(word, @"^[а-я]+я$")) { yield return Replace(word[..^1] + "ю"); yield return Replace(word[..^1] + "и"); yield return Replace(word[..^1] + "ей"); }
+        if (Regex.IsMatch(word, @"^[а-я]+[бвгджзклмнпрстфхцчшщ]$")) { yield return Replace(word + "а"); yield return Replace(word + "ом"); }
         yield return SpokenNumbers(normalized);
+    }
+    private static IEnumerable<string> Pronunciations(string name)
+    {
+        // Word-level pronunciations can be reused by any catalogue title, not app-specific aliases.
+        var words = new Dictionary<string, string[]> { ["kaspersky"] = ["касперский"], ["password"] = ["пасворд", "пассворд"],
+            ["manager"] = ["менеджер"], ["yandex"] = ["яндекс"], ["music"] = ["музыка", "мьюзик"],
+            ["word"] = ["ворд"], ["excel"] = ["эксель", "экссель"], ["microsoft"] = ["майкрософт"] };
+        IEnumerable<string> phrases = [""];
+        foreach (var word in name.Split(' '))
+        {
+            var options = words.GetValueOrDefault(word) ?? [Regex.IsMatch(word, "[a-z]") ? Transliterate(word) : word];
+            phrases = phrases.SelectMany(prefix => options.Select(option => (prefix + " " + option).Trim())).Distinct().Take(16).ToArray();
+        }
+        return phrases;
     }
 
     public static string NormalizeNumbers(string text) => string.Join(" ", text.Split(' ').Select(w => Roman.TryGetValue(w, out var n) ? n : w));

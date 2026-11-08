@@ -1,16 +1,32 @@
 <Window x:Class="Jarvis.App.CatalogWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Приложения и игры · JARVIS" Width="1200" Height="740" MinWidth="900" MinHeight="600" Background="#0D1928" Foreground="#E9F2F7" FontFamily="Segoe UI" FontSize="14" WindowStartupLocation="CenterOwner">
+  <Window.Resources>
+    <Style x:Key="CatalogText" TargetType="TextBlock">
+      <Setter Property="VerticalAlignment" Value="Center"/><Setter Property="Margin" Value="0"/>
+      <Setter Property="TextTrimming" Value="CharacterEllipsis"/><Setter Property="TextWrapping" Value="NoWrap"/>
+    </Style>
+    <Style x:Key="CatalogEditor" TargetType="TextBox"><Setter Property="Padding" Value="4,2"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
+    <Style x:Key="CatalogCheck" TargetType="CheckBox"><Setter Property="HorizontalAlignment" Value="Center"/><Setter Property="VerticalAlignment" Value="Center"/></Style>
+  </Window.Resources>
   <Grid Margin="24">
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-    <StackPanel Margin="0,0,0,18"><TextBlock Text="Приложения и игры" FontSize="26" FontWeight="SemiBold"/><TextBlock Text="Названия, сокращения и склонения добавляются автоматически. Свои варианты можно указать отдельно." TextWrapping="Wrap" Foreground="#9AB2C8" Margin="0,8,0,0"/></StackPanel>
+    <StackPanel Margin="0,0,0,18"><TextBlock Text="Приложения и игры" FontSize="26" FontWeight="SemiBold"/><TextBlock Text="Названия, сокращения и склонения добавляются автоматически. Свои варианты можно указать через запятую или точку с запятой." TextWrapping="Wrap" Foreground="#9AB2C8" Margin="0,8,0,0"/></StackPanel>
     <DockPanel Grid.Row="1" Margin="0,0,0,14"><Button x:Name="ScanButton" Content="Найти установленные" Click="ScanClick"/><Button Content="Добавить файл…" Click="AddClick"/><ComboBox x:Name="SourceBox" Width="145" Margin="0,0,10,0" SelectedIndex="0" SelectionChanged="SourceChanged" VerticalContentAlignment="Center" Foreground="#142438"><ComboBoxItem Content="Все источники"/><ComboBoxItem Content="Steam"/><ComboBoxItem Content="Windows / Xbox"/><ComboBoxItem Content="Добавлено вручную"/></ComboBox><TextBox x:Name="SearchBox" Padding="10" TextChanged="SearchChanged" ToolTip="Поиск по названию, источнику и своим вариантам" VerticalContentAlignment="Center"/></DockPanel>
-    <DataGrid x:Name="Entries" Grid.Row="2" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single" HeadersVisibility="Column" RowHeaderWidth="0" Background="#142438" Foreground="#142438" BorderThickness="0" RowHeight="38" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#CBD6DF" AlternatingRowBackground="#EFF4F8" RowBackground="White" SelectionUnit="FullRow">
+    <DataGrid x:Name="Entries" Grid.Row="2" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single" HeadersVisibility="Column" RowHeaderWidth="0" Background="#142438" Foreground="#142438" BorderThickness="0" RowHeight="46" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#D8E2EB" AlternatingRowBackground="#EFF4F8" RowBackground="White" SelectionUnit="FullRow">
+      <DataGrid.Resources>
+        <Style TargetType="DataGridColumnHeader"><Setter Property="Padding" Value="12,10"/><Setter Property="MinHeight" Value="56"/><Setter Property="VerticalContentAlignment" Value="Center"/><Setter Property="HorizontalContentAlignment" Value="Left"/><Setter Property="Background" Value="#E4EDF4"/><Setter Property="Foreground" Value="#33475B"/><Setter Property="BorderThickness" Value="0,0,1,1"/><Setter Property="BorderBrush" Value="#CFDBE5"/><Setter Property="ContentTemplate"><Setter.Value><DataTemplate><TextBlock Text="{Binding}" TextWrapping="Wrap"/></DataTemplate></Setter.Value></Setter></Style>
+        <Style TargetType="DataGridCell">
+          <Setter Property="Padding" Value="12,6"/><Setter Property="BorderThickness" Value="0"/><Setter Property="VerticalContentAlignment" Value="Center"/>
+          <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="DataGridCell"><Border Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}"><ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Stretch"/></Border></ControlTemplate></Setter.Value></Setter>
+          <Style.Triggers><Trigger Property="IsSelected" Value="True"><Setter Property="Background" Value="#CEE9E3"/><Setter Property="Foreground" Value="#153D35"/></Trigger></Style.Triggers>
+        </Style>
+      </DataGrid.Resources>
       <DataGrid.Columns>
-        <DataGridCheckBoxColumn Header="Включено" Binding="{Binding Enabled, UpdateSourceTrigger=PropertyChanged}" Width="85"/>
-        <DataGridTextColumn Header="Название" Binding="{Binding Name}" IsReadOnly="True" Width="2*"/>
-        <DataGridTextColumn Header="Источник" Binding="{Binding Source}" IsReadOnly="True" Width="130"/>
-        <DataGridTextColumn Header="Автоматические варианты" Binding="{Binding AutomaticText}" IsReadOnly="True" Width="2*"><DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="TextWrapping" Value="NoWrap"/><Setter Property="TextTrimming" Value="CharacterEllipsis"/><Setter Property="ToolTip" Value="{Binding AutomaticText}"/><Setter Property="VerticalAlignment" Value="Center"/></Style></DataGridTextColumn.ElementStyle></DataGridTextColumn>
-        <DataGridTextColumn Header="Свои названия (необязательно)" Binding="{Binding AliasesText, UpdateSourceTrigger=PropertyChanged}" Width="2*"/>
+        <DataGridCheckBoxColumn Header="Включено" Binding="{Binding Enabled, UpdateSourceTrigger=PropertyChanged}" Width="100" ElementStyle="{StaticResource CatalogCheck}" EditingElementStyle="{StaticResource CatalogCheck}"/>
+        <DataGridTextColumn Header="Название" Binding="{Binding Name}" IsReadOnly="True" Width="2*" ElementStyle="{StaticResource CatalogText}"/>
+        <DataGridTextColumn Header="Источник" Binding="{Binding Source}" IsReadOnly="True" Width="150" ElementStyle="{StaticResource CatalogText}"/>
+        <DataGridTextColumn Header="Автоматические варианты" Binding="{Binding AutomaticText}" IsReadOnly="True" Width="2*"><DataGridTextColumn.ElementStyle><Style TargetType="TextBlock" BasedOn="{StaticResource CatalogText}"><Setter Property="ToolTip" Value="{Binding AutomaticText}"/></Style></DataGridTextColumn.ElementStyle></DataGridTextColumn>
+        <DataGridTextColumn Header="Свои названия (необязательно)" Binding="{Binding AliasesText, UpdateSourceTrigger=PropertyChanged}" Width="2*" ElementStyle="{StaticResource CatalogText}" EditingElementStyle="{StaticResource CatalogEditor}"/>
       </DataGrid.Columns>
     </DataGrid>
     <StackPanel Grid.Row="3" Margin="0,14,0,14"><TextBlock x:Name="StatusText" Text="Нажми «Найти установленные» для поиска в Steam и Windows / Xbox." Foreground="#A2BACD"/><TextBlock Text="Наведи курсор на автоматические варианты, чтобы увидеть весь список. Свои названия сохраняются при повторном поиске. Если подходят несколько игр, Джарвис уточнит выбор голосом." TextWrapping="Wrap" FontSize="12" Foreground="#7F9BB3" Margin="0,8,0,0"/></StackPanel>

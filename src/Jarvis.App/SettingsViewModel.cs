@@ -14,6 +14,8 @@ public sealed class SettingsViewModel : ObservableObject
     public IReadOnlyList<Choice> Voices { get; } = [new("denis", "Денис · спокойный мужской"), new("dmitri", "Дмитрий · исходный голос")];
     public IReadOnlyList<Choice> Styles { get; } = [new("robot", "Синтез · роботизированный"), new("natural", "Естественный · без эффекта"), new("radio", "Радиоканал")];
     public string? MicrophoneId { get; set; }
+    public string MusicTargetId { get; set; }
+    public IReadOnlyList<Choice> MusicApps { get; }
     public string Voice { get; set; }
     private string _voiceStyle;
     public string VoiceStyle { get => _voiceStyle; set { SetProperty(ref _voiceStyle, value); OnPropertyChanged(nameof(EffectEnabled)); } }
@@ -30,6 +32,10 @@ public sealed class SettingsViewModel : ObservableObject
     {
         Runtime = runtime;
         var s = runtime.Settings;
+        MusicTargetId = s.MusicTargetId ?? "";
+        MusicApps = new[] { new Choice("", "Автоматически") }
+            .Concat(runtime.Targets.Where(t => t.Enabled).OrderByDescending(MusicSelection.IsMusicApp).ThenBy(t => t.Name)
+                .Select(t => new Choice(t.Id, t.Name))).ToArray();
         MicrophoneId = runtime.SelectedMicrophone?.Id ?? s.MicrophoneId;
         Voice = s.Voice; _voiceStyle = s.VoiceStyle; RobotAmount = s.RobotAmount;
         SpeechRate = s.SpeechRate; Volume = s.Volume; WakeMode = s.WakeMode;
@@ -39,6 +45,7 @@ public sealed class SettingsViewModel : ObservableObject
     public AssistantSettings Capture() => new AssistantSettings
     {
         MicrophoneId = MicrophoneId, Voice = Voice, VoiceStyle = VoiceStyle,
+        MusicTargetId = MusicTargetId,
         RobotAmount = Math.Round(RobotAmount, 2), SpeechRate = Math.Round(SpeechRate, 2),
         Volume = Math.Round(Volume, 2), WakeMode = WakeMode, CommandWaitSeconds = (int)CommandWaitSeconds,
         ShowLog = ShowLog, ReduceMotion = ReduceMotion

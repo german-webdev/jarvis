@@ -30,6 +30,13 @@
         <WrapPanel Margin="0,18,0,0"><Button Content="Прослушать" Click="PreviewClick" IsEnabled="{Binding Runtime.CanSpeak}"/><Button Content="Остановить" Click="StopClick" IsEnabled="{Binding Runtime.Busy}"/></WrapPanel>
         <TextBlock Text="Прослушивание использует выбранные здесь значения даже до сохранения. «Синтез» добавляет низкий металлический оттенок; это собственный эффект." Style="{StaticResource Hint}"/>
       </StackPanel></ScrollViewer></TabItem>
+      <TabItem><TabItem.Header><TextBlock Text="Музыка" Foreground="#15283A" Margin="8,5"/></TabItem.Header><StackPanel>
+        <TextBlock Text="Приложение для музыки" Style="{StaticResource Label}"/>
+        <ComboBox ItemsSource="{Binding MusicApps}" SelectedValuePath="Id" SelectedValue="{Binding MusicTargetId}" ItemTemplate="{StaticResource ChoiceTemplate}" Padding="9"/>
+        <TextBlock Text="«Включи музыку» откроет выбранное приложение и попросит продолжить воспроизведение. Если выбор автоматический и найдено несколько музыкальных приложений, Джарвис уточнит, какое использовать, и запомнит ответ." Style="{StaticResource Hint}"/>
+        <TextBlock Text="«Пауза», «Продолжи», «Дальше» и «Назад» относятся к выбранному плееру. Если он недоступен, команда не переключится сама на YouTube или другую вкладку." Style="{StaticResource Hint}"/>
+        <TextBlock Text="Чтобы снова управлять единственным доступным видео или другим плеером, выбери автоматический режим. Не каждое приложение предоставляет управление воспроизведением через Windows." Style="{StaticResource Hint}"/>
+      </StackPanel></TabItem>
       <TabItem><TabItem.Header><TextBlock Text="Поведение" Foreground="#15283A" Margin="8,5"/></TabItem.Header><StackPanel>
         <TextBlock Text="Способ обращения" Style="{StaticResource Label}"/><CheckBox Content="Ожидать имя «Джарвис»" IsChecked="{Binding WakeMode}" Foreground="#E5EEF6" Margin="0,8"/>
         <TextBlock Text="После нажатия «Начать» помощник ждёт имя, затем команду. Если флажок выключен, сразу слушает команду. При запуске приложения микрофон всегда выключен." Style="{StaticResource Hint}"/>
@@ -43,7 +50,7 @@
         <TextBlock Text="Волна реагирует на уровень микрофона и голосового ответа. Журнал хранится только до закрытия приложения." Style="{StaticResource Hint}"/>
         <TextBlock Text="Диагностика" Style="{StaticResource Label}"/><Button Content="Перезапустить голосовой модуль" Click="RestartClick" HorizontalAlignment="Left" Margin="0,4,0,0"/>
         <TextBlock Text="Используй, если распознавание или голос перестали отвечать. Настройки сохраняются." Style="{StaticResource Hint}"/>
-        <TextBlock Text="JARVIS 0.5 · локальный голосовой помощник" Foreground="#69859E" FontSize="12" Margin="0,28,0,0"/>
+        <TextBlock Text="JARVIS 0.6 · локальный голосовой помощник" Foreground="#69859E" FontSize="12" Margin="0,28,0,0"/>
       </StackPanel></TabItem>
     </TabControl>
     <TextBlock Grid.Row="2" Text="{Binding Runtime.Status}" Foreground="#91ACBF" FontSize="12" Margin="0,14,0,14" MinHeight="32"/>

@@ -138,16 +138,18 @@ def main():
             results["name_variants"] = []
             for phrase, expected in [("Запусти сабнавтику.", "сабнавтику"), ("Шестую.", "шестую"),
                                      ("Закрой телеграм.", "закрой телеграм"),
-                                     ("Открой папку с сабнавтикой.", "папку с сабнавтикой"), ("Пауза.", "пауза")]:
+                                     ("Открой папку с сабнавтикой.", "открой папку с сабнавтикой"), ("Пауза.", "пауза"),
+                                     ("Запусти Яндекс Музыку.", "яндекс музыку"), ("Запусти ворд.", ("ворд", "word", "ward")),
+                                     ("Запусти эксель.", ("эксель", "экссель", "excel")), ("Дальше.", "дальше"), ("Назад.", "назад")]:
                 send("synthesize", session=10, text=phrase)
                 sample = pcm16k(base64.b64decode(expect("speech")["wav"]))
                 send("start", session=11, mode="command", wait_seconds=10,
                      choosing=expected == "шестую",
-                     vocabulary="Subnautica, сабнавтика, сабнавтику, Forza Horizon 5, Forza Horizon 6, пятую, шестую, вариант два")
+                     vocabulary="Word, ворд, Excel, эксель, Яндекс Музыка, Яндекс Музыку, дальше, назад, Subnautica, сабнавтика, сабнавтику, Forza Horizon 5, Forza Horizon 6, пятую, шестую, вариант два")
                 expect("listening")
                 stream(sample + bytes(32000), 11)
                 recognized = expect("transcript")
-                assert expected in recognized["text"].lower(), recognized
+                assert any(word in recognized["text"].lower() for word in (expected if isinstance(expected, tuple) else (expected,))), recognized
                 results["name_variants"].append(recognized)
             (ROOT / "work" / "speech-smoke.json").write_text(
                 json.dumps(results, indent=2, ensure_ascii=False), encoding="utf-8"

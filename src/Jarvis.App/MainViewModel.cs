@@ -18,6 +18,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private readonly LaunchCatalogStore _catalogStore;
     private readonly SkillDispatcher _skills;
     private readonly WindowControl _windows = new();
+    private readonly MusicPlayback _music;
     private IReadOnlyList<LaunchTarget> _runningTargets = [];
     private readonly LaunchConversation _conversation = new();
     private bool _voiceInteraction;
@@ -92,10 +93,14 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         _catalogStore = new(Path.Combine(root, "data", "apps.json"));
         var catalog = _catalogStore.Load(); _targets = targets?.ToList() ?? catalog.Targets;
         if (catalog.Warning != null) Log(catalog.Warning);
-        _skills = skills ?? BuiltInSkills.Create(root, () => Targets, _windows);
         _settingsStore = new SettingsStore(Path.Combine(root, "data", "settings.json"));
         var loaded = _settingsStore.Load();
         _settings = loaded.Settings;
+        _music = new MusicPlayback(() => Targets, () => Settings.MusicTargetId, id =>
+        {
+            if (Settings.MusicTargetId != id) { ApplySettings(Settings with { MusicTargetId = id }); Log("Музыкальное приложение выбрано: " + Targets.FirstOrDefault(t => t.Id == id)?.Name); }
+        });
+        _skills = skills ?? BuiltInSkills.Create(root, () => Targets, _windows, _music);
         if (loaded.Warning != null) Log(loaded.Warning);
         _audio.Audio += data =>
         {
@@ -360,9 +365,11 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         Phase = AssistantPhase.Executing; Status = "Выполняю команду…";
         _deadline = DateTime.UtcNow.AddSeconds(30);
         ArtifactPath = null;
-        if (_conversation.ChoosingWindow || System.Text.RegularExpressions.Regex.IsMatch(CommandRouter.Normalize(text), @"\b(?:закрой|выключи|сверни|переключись|покажи)\b"))
-            _runningTargets = _windows.Capture(Targets);
-        var turn = _conversation.Resolve(text, Targets, DateTimeOffset.UtcNow, _runningTargets);
+        var preliminary = CommandRouter.Resolve(text, Targets, musicTargetId: Settings.MusicTargetId);
+        if (_conversation.ChoosingWindow || preliminary.Intent is Intent.CloseWindow or Intent.MinimizeWindow
+            || preliminary.CandidateIntent is Intent.CloseTarget or Intent.FocusTarget)
+            _runningTargets = await _windows.CaptureAsync(Targets, token);
+        var turn = _conversation.Resolve(text, Targets, DateTimeOffset.UtcNow, _runningTargets, Settings.MusicTargetId);
         if (turn.NeedsAnswer)
         {
             _lastVerified = false; _askingChoice = true; Reply = turn.Question!; Log(Reply);

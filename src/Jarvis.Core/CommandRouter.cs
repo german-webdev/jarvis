@@ -16,7 +16,7 @@ public static partial class CommandRouter
         var phrase = WakePrefix().Replace(Normalize(text), "");
         phrase = Politeness().Replace(phrase, "").Trim();
         if (text.Contains('?') && phrase is not ("сколько времени" or "который час" or "какое сегодня число" or "что ты умеешь")) return new(Intent.Unknown);
-        if (phrase is "отмена" or "отмени" or "стоп") return new(Intent.Cancel);
+        if (phrase is "отмена" or "отмени") return new(Intent.Cancel);
         if (OpenPhrase().IsMatch(phrase)) return new(Intent.OpenBrowser);
         if (phrase is "включи музыку" or "запусти музыку" or "давай музыку")
         {
@@ -38,7 +38,8 @@ public static partial class CommandRouter
             "сколько времени" or "который час" or "скажи время" => Intent.Time,
             "какое сегодня число" or "скажи дату" or "сегодняшняя дата" => Intent.Date,
             "что ты умеешь" or "покажи команды" or "список команд" => Intent.Help,
-            "пауза" or "поставь на паузу" or "приостанови воспроизведение" => Intent.MediaPause,
+            "пауза" or "стоп" or "останови" or "поставь на паузу" or "приостанови воспроизведение"
+                or "выключи музыку" or "останови музыку" or "отключи музыку" => Intent.MediaPause,
             "продолжи" or "продолжи воспроизведение" or "возобнови воспроизведение" or "сними с паузы" => Intent.MediaPlay,
             "следующий трек" or "следующая песня" or "включи следующий трек" or "дальше" or "следующий" or "следующая" => Intent.MediaNext,
             "предыдущий трек" or "предыдущая песня" or "включи предыдущий трек" or "назад" or "предыдущий" or "предыдущая" => Intent.MediaPrevious,

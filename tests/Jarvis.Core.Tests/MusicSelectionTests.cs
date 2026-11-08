@@ -10,7 +10,27 @@ public class MusicSelectionTests
     [Theory]
     [InlineData("дальше", Intent.MediaNext)] [InlineData("следующий", Intent.MediaNext)]
     [InlineData("назад", Intent.MediaPrevious)] [InlineData("предыдущий", Intent.MediaPrevious)]
+    [InlineData("выключи музыку", Intent.MediaPause)] [InlineData("останови музыку", Intent.MediaPause)]
+    [InlineData("отключи музыку", Intent.MediaPause)]
+    [InlineData("стоп", Intent.MediaPause)] [InlineData("останови", Intent.MediaPause)]
     public void ShortMediaCommands(string phrase, Intent expected) => Assert.Equal(expected, CommandRouter.Resolve(phrase).Intent);
+    [Theory][InlineData("стоп")][InlineData("останови")][InlineData("Джарвис, стоп, пожалуйста")]
+    public void ShortStopCancelsPendingChoiceButOtherwisePausesMedia(string phrase)
+    {
+        var dialog = new LaunchConversation(); var now = DateTimeOffset.UtcNow;
+        Assert.Equal(Intent.MediaPause, dialog.Resolve(phrase, _apps, now).Command?.Intent);
+        Assert.True(dialog.Resolve("Включи музыку", _apps, now).NeedsAnswer);
+        Assert.Equal(Intent.Cancel, dialog.Resolve(phrase, _apps, now).Command?.Intent);
+        Assert.False(dialog.HasPending);
+        Assert.Equal(Intent.MediaPause, dialog.Resolve(phrase, _apps, now).Command?.Intent);
+    }
+    [Fact] public void TurnMusicOffPausesInsteadOfClosingMatchingApplication()
+    {
+        var music = App("Музыка", "music");
+        var command = CommandRouter.Resolve("Джарвис, выключи музыку, пожалуйста", [music], [music]);
+        Assert.Equal(Intent.MediaPause, command.Intent);
+        Assert.Null(command.TargetId);
+    }
     [Fact] public void PausedMusicWinsOverBrowserEvenWhenBrowserIsPlaying()
     {
         var choice = MusicSelection.Choose([new("Chrome", null, true), new("ru.yandex.desktop.music", "yandex", false)], _apps, null);

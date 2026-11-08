@@ -25,6 +25,8 @@ public sealed class LaunchConversation
         var request = CommandRouter.Resolve(text, targets, running, musicTargetId);
         var answer = CommandRouter.Normalize(text);
         answer = Regex.Replace(answer, @"^(?:джарвис|jarvis) | пожалуйста$", "");
+        if (HasPending && request.Intent == Intent.MediaPause && answer is "стоп" or "останови")
+        { Clear(); return new(new(Intent.Cancel)); }
         if (request.Intent == Intent.Cancel || answer is "нет" or "не надо" or "ничего") { Clear(); return new(new(Intent.Cancel)); }
         // Explicit new commands replace the old question. A bare answer never starts a new action.
         if (request.Intent != Intent.Unknown || request.CandidateIds != null || request.CandidateIntent != null)

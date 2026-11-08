@@ -24,6 +24,6 @@ public class CommandRouterTests
 
     [Theory]
     [InlineData("Джарвис, отмена")]
-    [InlineData("стоп")]
+    [InlineData("отмени")]
     public void RecognizesCancellation(string text) => Assert.Equal(Intent.Cancel, CommandRouter.Parse(text));
 }

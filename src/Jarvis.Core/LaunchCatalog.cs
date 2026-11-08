@@ -16,6 +16,7 @@ public sealed record LaunchTarget(string Id, string Name, string Kind, string Ta
             "app" => Regex.IsMatch(Target, @"^[\p{L}\p{N}_.!{}\-]{1,256}$") || Regex.IsMatch(Target, "^\\{[A-Fa-f0-9-]{36}\\}\\\\[^\"<>|:]{1,220}$"),
             "exe" => Path.IsPathFullyQualified(Target) && Path.GetExtension(Target).Equals(".exe", StringComparison.OrdinalIgnoreCase),
             "shortcut" => Path.IsPathFullyQualified(Target) && Path.GetExtension(Target).Equals(".lnk", StringComparison.OrdinalIgnoreCase),
+            "url" => Id.StartsWith("site:", StringComparison.Ordinal) && WebSites.TryNormalizeAddress(Target, out _),
             _ => false
         });
 }

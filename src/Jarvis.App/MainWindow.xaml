@@ -5,7 +5,7 @@
   <Grid>
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
     <Menu Background="#E8EDF3" Foreground="#17283A" Padding="12,2">
-      <MenuItem Header="_Джарвис"><MenuItem Header="Приложения и игры…" Click="CatalogClick"/><MenuItem Header="Команда текстом…" Click="TextCommandClick"/><Separator/><MenuItem Header="Настройки…" InputGestureText="Ctrl+," Click="SettingsClick"/><Separator/><MenuItem Header="Выход" Click="ExitClick"/></MenuItem>
+      <MenuItem Header="_Джарвис"><MenuItem Header="Приложения и игры…" Click="CatalogClick"/><MenuItem Header="Сайты…" Click="SitesClick"/><MenuItem Header="Команда текстом…" Click="TextCommandClick"/><Separator/><MenuItem Header="Настройки…" InputGestureText="Ctrl+," Click="SettingsClick"/><Separator/><MenuItem Header="Выход" Click="ExitClick"/></MenuItem>
       <MenuItem Header="_Вид"><MenuItem Header="Журнал событий" IsCheckable="True" IsChecked="{Binding ShowLog}"/><MenuItem Header="Очистить журнал" Click="ClearHistoryClick"/></MenuItem>
       <MenuItem Header="_Справка"><MenuItem Header="Что я умею" Click="HelpClick"/></MenuItem>
     </Menu>

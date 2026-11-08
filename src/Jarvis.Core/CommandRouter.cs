@@ -22,7 +22,7 @@ public static partial class CommandRouter
         if (OpenPhrase().IsMatch(phrase)) return new(Intent.OpenBrowser);
         if (phrase is "включи музыку" or "запусти музыку" or "давай музыку")
         {
-            var music = (targets ?? []).Where(t => t.Enabled && (t.Id == musicTargetId || MusicSelection.IsMusicApp(t))).ToArray();
+            var music = (targets ?? []).Where(t => t.Enabled && t.Kind != "url" && (t.Id == musicTargetId || MusicSelection.IsMusicApp(t))).ToArray();
             var preferred = music.FirstOrDefault(t => t.Id == musicTargetId);
             if (preferred != null) return new(Intent.StartMusic, preferred.Id);
             return music.Length switch { 1 => new(Intent.StartMusic, music[0].Id),
@@ -55,7 +55,7 @@ public static partial class CommandRouter
         };
         if (simple != Intent.Unknown) return new(simple);
         var folder = Regex.Match(phrase, @"^открой (?:папку|каталог)(?: (?:с|для))?(?: (?:игрой|игры|программой|программы|приложением|приложения))? (.+)$");
-        if (folder.Success) return MatchTarget(folder.Groups[1].Value, targets, Intent.OpenTargetFolder);
+        if (folder.Success) return MatchTarget(folder.Groups[1].Value, targets?.Where(t => t.Kind != "url"), Intent.OpenTargetFolder);
         var window = Regex.Match(phrase, @"^(закрой|выключи|переключись на|покажи)(?: (?:игру|приложение|программу))? (.+)$");
         if (window.Success) return MatchTarget(window.Groups[2].Value, running,
             window.Groups[1].Value is "закрой" or "выключи" ? Intent.CloseTarget : Intent.FocusTarget,
@@ -64,6 +64,11 @@ public static partial class CommandRouter
         if (volume.Success && TryNumber(volume.Groups[1].Value, out var value) && value is >= 0 and <= 100)
             return new(Intent.SetVolume, Value: value);
         var launch = LaunchPhrase().Match(phrase);
+        var website = Regex.Match(phrase, @"^(?:открой|запусти|включи)(?: пожалуйста)?(?: мне)? сайт (.+)$");
+        if (website.Success) return MatchTarget(website.Groups[1].Value, targets?.Where(t => t.Kind == "url"), Intent.LaunchTarget,
+            "Такого сайта нет в каталоге. Добавь его через меню «Джарвис → Сайты».");
+        var application = Regex.Match(phrase, @"^(?:открой|запусти|включи)(?: пожалуйста)?(?: мне)? (?:игру|приложение|программу) (.+)$");
+        if (application.Success) return MatchTarget(application.Groups[1].Value, targets?.Where(t => t.Kind != "url"), Intent.LaunchTarget);
         if (!launch.Success) return new(Intent.Unknown);
         return MatchTarget(launch.Groups[1].Value, targets, Intent.LaunchTarget);
     }
@@ -71,6 +76,13 @@ public static partial class CommandRouter
     {
         var enabled = (targets ?? []).Where(t => t.Enabled).ToArray();
         var matches = enabled.Where(t => t.Names.Any(n => Normalize(n) == name)).DistinctBy(t => t.Id).ToArray();
+        // Bare mail requests use the webmail aliases selected in the site catalog.
+        // Explicit "открой приложение почта" already filters sites out above.
+        if (intent == Intent.LaunchTarget && name is "почта" or "почту" or "почты" or "почтой")
+        {
+            var mailSites = matches.Where(t => t.Kind == "url").ToArray();
+            if (mailSites.Length > 0) matches = mailSites;
+        }
         return matches.Length switch
         {
             1 => new(intent, matches[0].Id),

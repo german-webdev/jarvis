@@ -10,6 +10,7 @@ public static class TargetLauncher
     {
         token.ThrowIfCancellationRequested();
         if (!target.Enabled || !target.IsValid) return Task.FromResult(new SkillResult(false, "Это приложение выключено или неверно настроено в каталоге."));
+        if (target.Kind == "url") return BrowserLauncher.OpenSiteAsync(target, token);
         ProcessStartInfo start;
         if (target.Kind is "exe" or "shortcut")
         {

@@ -16,6 +16,10 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private readonly AudioService _audio = new();
     private readonly SettingsStore _settingsStore;
     private readonly LaunchCatalogStore _catalogStore;
+    private readonly LaunchCatalogStore _siteStore;
+    private List<LaunchTarget> _sites = [];
+    public IReadOnlyList<LaunchTarget> Sites => _sites;
+    private IReadOnlyList<LaunchTarget> CommandTargets => Targets.Concat(Sites).ToArray();
     private readonly SkillDispatcher _skills;
     private readonly WindowControl _windows = new();
     private readonly MusicPlayback _music;
@@ -93,6 +97,11 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         _catalogStore = new(Path.Combine(root, "data", "apps.json"));
         var catalog = _catalogStore.Load(); _targets = targets?.ToList() ?? catalog.Targets;
         if (catalog.Warning != null) Log(catalog.Warning);
+        var sitePath = Path.Combine(root, "data", "sites.json");
+        _siteStore = new(sitePath);
+        var websites = _siteStore.Load();
+        _sites = File.Exists(sitePath) ? websites.Targets.Where(t => t.Kind == "url").ToList() : WebSites.Defaults();
+        if (websites.Warning != null) Log("Сайты: " + websites.Warning);
         _settingsStore = new SettingsStore(Path.Combine(root, "data", "settings.json"));
         var loaded = _settingsStore.Load();
         _settings = loaded.Settings;
@@ -100,7 +109,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         {
             if (Settings.MusicTargetId != id) { ApplySettings(Settings with { MusicTargetId = id }); Log("Музыкальное приложение выбрано: " + Targets.FirstOrDefault(t => t.Id == id)?.Name); }
         });
-        _skills = skills ?? BuiltInSkills.Create(root, () => Targets, _windows, _music);
+        _skills = skills ?? BuiltInSkills.Create(root, () => CommandTargets, _windows, _music);
         if (loaded.Warning != null) Log(loaded.Warning);
         _audio.Audio += data =>
         {
@@ -345,9 +354,17 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         var updated = targets.ToList(); _catalogStore.Save(updated); _targets = updated;
         OnPropertyChanged(nameof(Targets)); Log($"Каталог сохранён · включено {_targets.Count(t => t.Enabled)}");
     }
+    public void SaveSites(IEnumerable<LaunchTarget> sites)
+    {
+        var updated = sites.ToList();
+        if (updated.Any(t => t.Kind != "url") || updated.Select(t => t.Id).Distinct().Count() != updated.Count)
+            throw new InvalidDataException("В каталоге сайтов есть неверные или повторяющиеся записи.");
+        _siteStore.Save(updated); _sites = updated; _conversation.Clear();
+        OnPropertyChanged(nameof(Sites)); Log($"Сайты сохранены · включено {_sites.Count(t => t.Enabled)}");
+    }
     private string Vocabulary()
     {
-        var enabled = (_conversation.ChoosingWindow ? _runningTargets : Targets).Where(t => t.Enabled).ToArray();
+        var enabled = (_conversation.ChoosingWindow ? _runningTargets : CommandTargets).Where(t => t.Enabled).ToArray();
         if (_conversation.HasPending)
             enabled = enabled.Where(t => _conversation.CandidateIds.Contains(t.Id)).ToArray();
         return LaunchVocabulary.Build(enabled, _conversation.HasPending);
@@ -369,11 +386,11 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         Phase = AssistantPhase.Executing; Status = "Выполняю команду…";
         _deadline = DateTime.UtcNow.AddSeconds(30);
         ArtifactPath = null;
-        var preliminary = CommandRouter.Resolve(text, Targets, musicTargetId: Settings.MusicTargetId);
+        var preliminary = CommandRouter.Resolve(text, CommandTargets, musicTargetId: Settings.MusicTargetId);
         if (_conversation.ChoosingWindow || preliminary.Intent is Intent.CloseWindow or Intent.MinimizeWindow
             || preliminary.CandidateIntent is Intent.CloseTarget or Intent.FocusTarget)
             _runningTargets = await _windows.CaptureAsync(Targets, token);
-        var turn = _conversation.Resolve(text, Targets, DateTimeOffset.UtcNow, _runningTargets, Settings.MusicTargetId);
+        var turn = _conversation.Resolve(text, CommandTargets, DateTimeOffset.UtcNow, _runningTargets, Settings.MusicTargetId);
         if (turn.NeedsAnswer)
         {
             _lastVerified = false; _askingChoice = true; Reply = turn.Question!; Log(Reply);

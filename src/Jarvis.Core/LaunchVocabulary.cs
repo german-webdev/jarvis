@@ -6,7 +6,7 @@ public static class LaunchVocabulary
     public static string Build(IEnumerable<LaunchTarget> targets, bool choosing = false)
     {
         var enabled = targets.Where(t => t.Enabled).ToArray();
-        var priority = enabled.Where(t => choosing || t.Kind == "steam" || t.Source == "Xbox" || MusicSelection.IsMusicApp(t) || IsDesktopPriority(t)
+        var priority = enabled.Where(t => choosing || t.Kind is "steam" or "url" || t.Source == "Xbox" || MusicSelection.IsMusicApp(t) || IsDesktopPriority(t)
             || t.Aliases?.Length > 0 || CommandRouter.Normalize(t.Name) is "telegram" or "steam" or "xbox")
             .OrderByDescending(t => IsDesktopPriority(t) || MusicSelection.IsMusicApp(t))
             .Select(t => t.Names.Take(12).ToArray()).ToArray();

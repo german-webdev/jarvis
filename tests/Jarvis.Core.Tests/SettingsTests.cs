@@ -44,6 +44,9 @@ public class SettingsTests
     {
         var settings = System.Text.Json.JsonSerializer.Deserialize<AssistantSettings>("{\"WakeMode\":true}")!.Normalize();
         Assert.True(settings.WakeMode);
+        Assert.True(new AssistantSettings().WakeMode);
+        Assert.True(System.Text.Json.JsonSerializer.Deserialize<AssistantSettings>("{}")!.Normalize().WakeMode);
+        Assert.False(System.Text.Json.JsonSerializer.Deserialize<AssistantSettings>("{\"WakeMode\":false}")!.Normalize().WakeMode);
         Assert.False(settings.ListenOnStartup);
         Assert.True(settings.StartInTray);
     }

@@ -7,7 +7,7 @@ public sealed record AssistantSettings
     public int Version { get; init; } = 1;
     public string? MicrophoneId { get; init; }
     public string? MusicTargetId { get; init; }
-    public bool WakeMode { get; init; }
+    public bool WakeMode { get; init; } = true;
     public bool WakeSound { get; init; } = true;
     public bool FollowUpListening { get; init; } = true;
     public string Voice { get; init; } = "denis";

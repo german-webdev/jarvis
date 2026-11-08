@@ -78,9 +78,9 @@ public sealed class WorkerClient : IAsyncDisposable
         if (_process is { HasExited: false })
         {
             _process.Kill(entireProcessTree: true);
-            await _process.WaitForExitAsync();
+            await _process.WaitForExitAsync().ConfigureAwait(false);
         }
-        try { await Task.WhenAll(new[] { _reader, _writer, _errors }.OfType<Task>()); }
+        try { await Task.WhenAll(new[] { _reader, _writer, _errors }.OfType<Task>()).ConfigureAwait(false); }
         catch (OperationCanceledException) { }
         catch (IOException) { }
         _process?.Dispose();

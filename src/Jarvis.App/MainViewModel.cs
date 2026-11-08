@@ -55,21 +55,21 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private double _level;
     private Microphone? _selected;
 
-    public string Status { get => _status; private set => SetProperty(ref _status, value); }
-    public string Transcript { get => _transcript; private set => SetProperty(ref _transcript, value); }
-    public string Reply { get => _reply; private set => SetProperty(ref _reply, value); }
+    public string Status { get => Ui.Text(_status); private set => SetProperty(ref _status, value); }
+    public string Transcript { get => _transcript == "Здесь появится распознанная фраза" ? Ui.Text(_transcript) : _transcript; private set => SetProperty(ref _transcript, value); }
+    public string Reply { get => _reply == "Открой браузер · Запусти браузер" ? Ui.Text(_reply) : _reply; private set => SetProperty(ref _reply, value); }
     public bool Ready { get => _ready; private set { SetProperty(ref _ready, value); Changed(); } }
     public bool Busy { get => _busy; private set { SetProperty(ref _busy, value); Changed(); } }
     public bool WakeMode => Settings.WakeMode;
     public AssistantSettings Settings => _settings;
     public bool ReduceMotion => Settings.ReduceMotion;
-    public string ModeLabel => WakeMode ? "По имени · Джарвис" : "По кнопке";
-    public string VoiceLabel => Settings.VoiceStyle switch { "robot" => "Синтез", "radio" => "Радиоканал", _ => "Естественный голос" };
+    public string ModeLabel => Ui.Text(WakeMode ? "По имени · JARVIS" : "По кнопке");
+    public string VoiceLabel => Ui.Text(Settings.VoiceStyle switch { "robot" => "Синтез", "radio" => "Радиоканал", _ => "Естественный голос" });
     public bool ShowLog { get => Settings.ShowLog; set { if (value != Settings.ShowLog) { try { ApplySettings(Settings with { ShowLog = value }); } catch (Exception ex) { Log("Настройки: " + ex.Message); } } } }
     public bool MicrophoneActive { get => _microphoneActive; private set { SetProperty(ref _microphoneActive, value); OnPropertyChanged(nameof(MicrophoneLabel)); } }
-    public string MicrophoneLabel => MicrophoneActive ? "Микрофон включён" : "Микрофон выключен";
+    public string MicrophoneLabel => Ui.Text(MicrophoneActive ? "Микрофон включён" : "Микрофон выключен");
     public AssistantPhase Phase { get => _phase; private set { SetProperty(ref _phase, value); OnPropertyChanged(nameof(PhaseTitle)); } }
-    public string PhaseTitle => Phase switch
+    public string PhaseTitle => Ui.Text(Phase switch
     {
         AssistantPhase.Loading => "Знакомлюсь с системой",
         AssistantPhase.WaitingForName => "Я на связи",
@@ -80,7 +80,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         AssistantPhase.Speaking => "Отвечаю",
         AssistantPhase.Fault => "Нужно внимание",
         _ => "Готов к работе"
-    };
+    });
     public double Level { get => _level; private set => SetProperty(ref _level, value); }
     public Microphone? SelectedMicrophone { get => _selected; set { SetProperty(ref _selected, value); Changed(); } }
     public bool CanListen => Ready && !Busy && SelectedMicrophone != null;
@@ -88,12 +88,14 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     public bool CanConfigure => !Busy;
     public ObservableCollection<Microphone> Microphones { get; } = [];
     public ObservableCollection<string> History { get; } = [];
+    private readonly List<string> _rawHistory = [];
     public event Action? Initialized;
     public event Action<bool>? CycleCompleted;
 
     public MainViewModel(string root, IReadOnlyList<LaunchTarget>? targets = null, SkillDispatcher? skills = null)
     {
         _root = root;
+        Ui.Changed += RefreshLanguage;
         _catalogStore = new(Path.Combine(root, "data", "apps.json"));
         var catalog = _catalogStore.Load(); _targets = targets?.ToList() ?? catalog.Targets;
         if (catalog.Warning != null) Log(catalog.Warning);
@@ -130,7 +132,10 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private static void Dispatch(Action action) => Application.Current.Dispatcher.BeginInvoke(action);
     private void Log(string text)
     {
-        History.Insert(0, $"{DateTime.Now:HH:mm:ss}  {text}");
+        var entry = $"{DateTime.Now:HH:mm:ss}  {text}";
+        _rawHistory.Insert(0, entry);
+        while (_rawHistory.Count > 30) _rawHistory.RemoveAt(30);
+        History.Insert(0, Ui.Text(entry));
         while (History.Count > 30) History.RemoveAt(History.Count - 1);
     }
 
@@ -447,11 +452,19 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         settings = settings.Normalize();
         _settingsStore.Save(settings);
         _settings = settings;
+        Ui.Apply(settings.InterfaceLanguage);
         if (!Busy) RefreshDevices();
         foreach (var name in new[] { nameof(Settings), nameof(WakeMode), nameof(ModeLabel), nameof(VoiceLabel), nameof(ReduceMotion), nameof(ShowLog) }) OnPropertyChanged(name);
     }
 
-    public void ClearHistory() => History.Clear();
+    public void ClearHistory() { _rawHistory.Clear(); History.Clear(); }
+
+    private void RefreshLanguage()
+    {
+        foreach (var name in new[] { nameof(Status), nameof(Transcript), nameof(Reply), nameof(ModeLabel), nameof(VoiceLabel), nameof(MicrophoneLabel), nameof(PhaseTitle) }) OnPropertyChanged(name);
+        History.Clear();
+        foreach (var entry in _rawHistory) History.Add(Ui.Text(entry));
+    }
 
     private void Send(object message)
     { if (_worker?.Send(message) != true) throw new IOException("Голосовой модуль не принимает команды."); }
@@ -463,9 +476,11 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        if (_disposed) return;
         _disposed = true;
+        Ui.Changed -= RefreshLanguage;
         _watchdog.Stop(); Stop(); _audio.Dispose();
-        if (_worker != null) await _worker.DisposeAsync();
+        if (_worker != null) await _worker.DisposeAsync().ConfigureAwait(false);
         _operation.Dispose();
     }
 }

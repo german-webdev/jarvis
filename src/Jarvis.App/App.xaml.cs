@@ -8,13 +8,15 @@ namespace Jarvis.App;
 public partial class App : Application
 {
     private Mutex? _instance;
+    private EventWaitHandle? _showWindow;
+    private RegisteredWaitHandle? _showWait;
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
         if (e.Args.FirstOrDefault() == "--focus-window") { Shutdown(WindowFocus.Run(e.Args)); return; }
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory != null && !File.Exists(Path.Combine(directory.FullName, "pyproject.toml"))) directory = directory.Parent;
-        if (directory == null) { MessageBox.Show("Не найдена папка проекта. Запускай Джарвис через Start-Jarvis.cmd."); Shutdown(1); return; }
+        if (directory == null) { MessageBox.Show(Ui.Text("Не найдена папка проекта. Запускай JARVIS через Start-Jarvis.cmd.")); Shutdown(1); return; }
         if (e.Args.Length == 2 && e.Args[0] == "--scan-apps")
         {
             var path = Path.GetFullPath(e.Args[1]);
@@ -30,13 +32,29 @@ public partial class App : Application
             return;
         }
         _instance = new Mutex(true, "Local\\JarvisVoicePrototype", out var created);
-        if (!created) { MessageBox.Show("Джарвис уже запущен. Найди его окно на панели задач."); _instance.Dispose(); _instance = null; Shutdown(); return; }
+        if (!created)
+        {
+            using var signal = new EventWaitHandle(false, EventResetMode.AutoReset, "Local\\JarvisVoicePrototype.Show");
+            signal.Set();
+            _instance.Dispose(); _instance = null; Shutdown(); return;
+        }
+        _showWindow = new EventWaitHandle(false, EventResetMode.AutoReset, "Local\\JarvisVoicePrototype.Show");
         var window = new MainWindow(directory.FullName, e.Args);
+        _showWait = ThreadPool.RegisterWaitForSingleObject(_showWindow, (_, _) =>
+            Dispatcher.BeginInvoke(window.ShowFromTray), null, Timeout.Infinite, executeOnlyOnce: false);
         MainWindow = window; window.Show();
+    }
+
+    protected override void OnSessionEnding(SessionEndingCancelEventArgs e)
+    {
+        if (MainWindow is MainWindow window) window.EndWindowsSession();
+        base.OnSessionEnding(e);
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _showWait?.Unregister(null);
+        _showWindow?.Dispose();
         _instance?.ReleaseMutex(); _instance?.Dispose();
         base.OnExit(e);
     }

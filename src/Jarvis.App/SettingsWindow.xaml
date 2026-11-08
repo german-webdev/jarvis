@@ -1,5 +1,5 @@
 <Window x:Class="Jarvis.App.SettingsWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Настройки · JARVIS" Width="730" Height="780" MinWidth="620" MinHeight="660" Background="#0D1928" Foreground="#E9F2F7" FontFamily="Segoe UI" FontSize="14" WindowStartupLocation="CenterOwner">
+        Title="{DynamicResource Ui178723ED32B6}" Width="730" Height="780" MinWidth="620" MinHeight="660" Background="#0D1928" Foreground="#E9F2F7" FontFamily="Segoe UI" FontSize="14" WindowStartupLocation="CenterOwner">
   <Window.Resources>
     <Style x:Key="Label" TargetType="TextBlock"><Setter Property="Foreground" Value="#DCE8F1"/><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="Margin" Value="0,18,0,8"/></Style>
     <Style x:Key="Hint" TargetType="TextBlock"><Setter Property="Foreground" Value="#8FA7BC"/><Setter Property="TextWrapping" Value="Wrap"/><Setter Property="FontSize" Value="12"/><Setter Property="Margin" Value="0,8,0,0"/></Style>
@@ -7,53 +7,62 @@
   </Window.Resources>
   <Grid Margin="24">
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-    <StackPanel Margin="0,0,0,18"><TextBlock Text="Настройки" FontSize="26" FontWeight="SemiBold"/><TextBlock Text="Прослушивание приостановлено. Изменения применяются после сохранения." Style="{StaticResource Hint}"/></StackPanel>
+    <StackPanel Margin="0,0,0,18"><TextBlock Text="{DynamicResource Ui985B5E0F2CCF}" FontSize="26" FontWeight="SemiBold"/><TextBlock Text="{DynamicResource UiC1582DA2E02F}" Style="{StaticResource Hint}"/></StackPanel>
     <TabControl Grid.Row="1" Background="#122236" Foreground="#E9F2F7" BorderBrush="#2A4055" Padding="18">
-      <TabItem><TabItem.Header><TextBlock Text="Микрофон" Foreground="#15283A" Margin="8,5"/></TabItem.Header><StackPanel>
-        <TextBlock Text="Устройство ввода" Style="{StaticResource Label}"/>
+      <TabItem><TabItem.Header><TextBlock Text="{DynamicResource UiF03841529528}" Foreground="#15283A" Margin="8,5"/></TabItem.Header><StackPanel>
+        <TextBlock Text="{DynamicResource UiEBB14DC5074B}" Style="{StaticResource Label}"/>
         <ComboBox ItemsSource="{Binding Microphones}" SelectedValuePath="Id" SelectedValue="{Binding MicrophoneId}" Padding="10" IsEnabled="{Binding Runtime.CanSpeak}"><ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Name}" Foreground="#17283A"/></DataTemplate></ComboBox.ItemTemplate></ComboBox>
-        <TextBlock Text="Выбери вход, к которому подключён микрофон. Для первой проверки удобнее использовать гарнитуру." Style="{StaticResource Hint}"/>
-        <Button Content="Обновить устройства" HorizontalAlignment="Left" Margin="0,16,0,0" Click="RefreshClick" IsEnabled="{Binding Runtime.CanConfigure}"/>
-        <TextBlock Text="Запись и приватность" Style="{StaticResource Label}"/><TextBlock Text="Речь обрабатывается локально. Аудио микрофона не сохраняется. Во время голосового ответа микрофон выключен." Style="{StaticResource Hint}"/>
+        <TextBlock Text="{DynamicResource UiA3DD2CA652B1}" Style="{StaticResource Hint}"/>
+        <Button Content="{DynamicResource Ui8BC912B90E03}" HorizontalAlignment="Left" Margin="0,16,0,0" Click="RefreshClick" IsEnabled="{Binding Runtime.CanConfigure}"/>
+        <TextBlock Text="{DynamicResource UiC8CD94FE0E68}" Style="{StaticResource Label}"/><TextBlock Text="{DynamicResource UiA71ACE19CBB7}" Style="{StaticResource Hint}"/>
       </StackPanel></TabItem>
-      <TabItem><TabItem.Header><TextBlock Text="Голос" Foreground="#15283A" Margin="8,5"/></TabItem.Header><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel>
-        <TextBlock Text="Тембр" Style="{StaticResource Label}" Margin="0,2,0,8"/>
+      <TabItem><TabItem.Header><TextBlock Text="{DynamicResource Ui24A0D703AFD4}" Foreground="#15283A" Margin="8,5"/></TabItem.Header><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel>
+        <TextBlock Text="{DynamicResource Ui3E157F94830A}" Style="{StaticResource Label}" Margin="0,2,0,8"/>
         <ComboBox ItemsSource="{Binding Voices}" SelectedValuePath="Id" SelectedValue="{Binding Voice}" ItemTemplate="{StaticResource ChoiceTemplate}" Padding="9"/>
-        <TextBlock Text="Характер звучания" Style="{StaticResource Label}"/>
+        <TextBlock Text="{DynamicResource UiD2C790BED7F9}" Style="{StaticResource Label}"/>
         <ComboBox ItemsSource="{Binding Styles}" SelectedValuePath="Id" SelectedValue="{Binding VoiceStyle}" ItemTemplate="{StaticResource ChoiceTemplate}" Padding="9"/>
-        <Grid Margin="0,16,0,0"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="Роботизация" Foreground="#DCE8F1"/><TextBlock Grid.Column="1" Text="{Binding ElementName=EffectSlider, Path=Value, StringFormat={}{0:P0}}" Foreground="#79DCC8"/></Grid>
+        <Grid Margin="0,16,0,0"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="{DynamicResource Ui8D8A8440BC62}" Foreground="#DCE8F1"/><TextBlock Grid.Column="1" Text="{Binding ElementName=EffectSlider, Path=Value, StringFormat={}{0:P0}}" Foreground="#79DCC8"/></Grid>
         <Slider x:Name="EffectSlider" Value="{Binding RobotAmount}" Minimum="0" Maximum="1" TickFrequency="0.05" IsSnapToTickEnabled="True" IsEnabled="{Binding EffectEnabled}" Margin="0,7,0,0"/>
-        <Grid Margin="0,14,0,0"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="Темп речи" Foreground="#DCE8F1"/><TextBlock Grid.Column="1" Text="{Binding ElementName=RateSlider, Path=Value, StringFormat={}{0:F2}×}" Foreground="#79DCC8"/></Grid>
+        <Grid Margin="0,14,0,0"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="{DynamicResource UiE588669702E0}" Foreground="#DCE8F1"/><TextBlock Grid.Column="1" Text="{Binding ElementName=RateSlider, Path=Value, StringFormat={}{0:F2}×}" Foreground="#79DCC8"/></Grid>
         <Slider x:Name="RateSlider" Value="{Binding SpeechRate}" Minimum="0.85" Maximum="1.2" TickFrequency="0.05" IsSnapToTickEnabled="True" Margin="0,7,0,0"/>
-        <Grid Margin="0,14,0,0"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="Громкость ответа" Foreground="#DCE8F1"/><TextBlock Grid.Column="1" Text="{Binding ElementName=VolumeSlider, Path=Value, StringFormat={}{0:P0}}" Foreground="#79DCC8"/></Grid>
+        <Grid Margin="0,14,0,0"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="{DynamicResource UiE2EED72A8256}" Foreground="#DCE8F1"/><TextBlock Grid.Column="1" Text="{Binding ElementName=VolumeSlider, Path=Value, StringFormat={}{0:P0}}" Foreground="#79DCC8"/></Grid>
         <Slider x:Name="VolumeSlider" Value="{Binding Volume}" Minimum="0" Maximum="1" TickFrequency="0.05" IsSnapToTickEnabled="True" Margin="0,7,0,0"/>
-        <WrapPanel Margin="0,18,0,0"><Button Content="Прослушать" Click="PreviewClick" IsEnabled="{Binding Runtime.CanSpeak}"/><Button Content="Остановить" Click="StopClick" IsEnabled="{Binding Runtime.Busy}"/></WrapPanel>
-        <TextBlock Text="Прослушивание использует выбранные здесь значения даже до сохранения. «Синтез» добавляет низкий металлический оттенок; это собственный эффект." Style="{StaticResource Hint}"/>
+        <WrapPanel Margin="0,18,0,0"><Button Content="{DynamicResource UiA738A353EEB5}" Click="PreviewClick" IsEnabled="{Binding Runtime.CanSpeak}"/><Button Content="{DynamicResource Ui3396400DA0C4}" Click="StopClick" IsEnabled="{Binding Runtime.Busy}"/></WrapPanel>
+        <TextBlock Text="{DynamicResource UiB5C67EB391D6}" Style="{StaticResource Hint}"/>
       </StackPanel></ScrollViewer></TabItem>
-      <TabItem><TabItem.Header><TextBlock Text="Музыка" Foreground="#15283A" Margin="8,5"/></TabItem.Header><StackPanel>
-        <TextBlock Text="Приложение для музыки" Style="{StaticResource Label}"/>
+      <TabItem><TabItem.Header><TextBlock Text="{DynamicResource Ui26D99DF6EAB5}" Foreground="#15283A" Margin="8,5"/></TabItem.Header><StackPanel>
+        <TextBlock Text="{DynamicResource Ui79FE2AE9D454}" Style="{StaticResource Label}"/>
         <ComboBox ItemsSource="{Binding MusicApps}" SelectedValuePath="Id" SelectedValue="{Binding MusicTargetId}" ItemTemplate="{StaticResource ChoiceTemplate}" Padding="9"/>
-        <TextBlock Text="«Включи музыку» откроет выбранное приложение и попросит продолжить воспроизведение. Если выбор автоматический и найдено несколько музыкальных приложений, Джарвис уточнит, какое использовать, и запомнит ответ." Style="{StaticResource Hint}"/>
-        <TextBlock Text="«Пауза», «Продолжи», «Дальше» и «Назад» относятся к выбранному плееру. Если он недоступен, команда не переключится сама на YouTube или другую вкладку." Style="{StaticResource Hint}"/>
-        <TextBlock Text="Чтобы снова управлять единственным доступным видео или другим плеером, выбери автоматический режим. Не каждое приложение предоставляет управление воспроизведением через Windows." Style="{StaticResource Hint}"/>
+        <TextBlock Text="{DynamicResource Ui4D2A4F3DBB1B}" Style="{StaticResource Hint}"/>
+        <TextBlock Text="{DynamicResource UiBBDA2866C6C4}" Style="{StaticResource Hint}"/>
+        <TextBlock Text="{DynamicResource Ui8D0A8F2259DE}" Style="{StaticResource Hint}"/>
       </StackPanel></TabItem>
-      <TabItem><TabItem.Header><TextBlock Text="Поведение" Foreground="#15283A" Margin="8,5"/></TabItem.Header><StackPanel>
-        <TextBlock Text="Способ обращения" Style="{StaticResource Label}"/><CheckBox Content="Ожидать имя «Джарвис»" IsChecked="{Binding WakeMode}" Foreground="#E5EEF6" Margin="0,8"/>
-        <TextBlock Text="После нажатия «Начать» помощник ждёт имя, затем команду. Если флажок выключен, сразу слушает команду. При запуске приложения микрофон всегда выключен." Style="{StaticResource Hint}"/>
-        <TextBlock Text="Пауза после имени" Style="{StaticResource Label}"/>
-        <DockPanel><TextBlock DockPanel.Dock="Right" Text="{Binding ElementName=WaitSlider, Path=Value, StringFormat={}{0:F0} сек.}" Foreground="#79DCC8" Width="65" TextAlignment="Right"/><Slider x:Name="WaitSlider" Value="{Binding CommandWaitSeconds}" Minimum="4" Maximum="15" TickFrequency="1" IsSnapToTickEnabled="True"/></DockPanel>
-        <TextBlock Text="Столько времени можно подождать перед командой. Если ты ничего не сказал, Джарвис молча возвращается к ожиданию имени." Style="{StaticResource Hint}"/>
-        <TextBlock Text="Остановка" Style="{StaticResource Label}"/><TextBlock Text="Кнопка «Стоп» и Esc выключают микрофон и прерывают озвучку. Уже открытый браузер остаётся открытым." Style="{StaticResource Hint}"/>
+      <TabItem><TabItem.Header><TextBlock Text="{DynamicResource Ui132B8F4355BF}" Foreground="#15283A" Margin="8,5"/></TabItem.Header><StackPanel>
+        <TextBlock Text="{DynamicResource Ui327B7A8A8415}" Style="{StaticResource Label}"/><CheckBox Content="{DynamicResource Ui4E44E36ACC06}" IsChecked="{Binding WakeMode}" Foreground="#E5EEF6" Margin="0,8"/>
+        <TextBlock Text="{DynamicResource UiCF4573A480B9}" Style="{StaticResource Hint}"/>
+        <TextBlock Text="{DynamicResource Ui38A7BE02AFAD}" Style="{StaticResource Label}"/>
+        <DockPanel><TextBlock DockPanel.Dock="Right" Text="{Binding ElementName=WaitSlider, Path=Value, StringFormat={StaticResource Ui8ED2D26D4DAD}}" Foreground="#79DCC8" Width="65" TextAlignment="Right"/><Slider x:Name="WaitSlider" Value="{Binding CommandWaitSeconds}" Minimum="4" Maximum="15" TickFrequency="1" IsSnapToTickEnabled="True"/></DockPanel>
+        <TextBlock Text="{DynamicResource Ui0C144C98696D}" Style="{StaticResource Hint}"/>
+        <TextBlock Text="{DynamicResource Ui065A18F569BF}" Style="{StaticResource Label}"/><TextBlock Text="{DynamicResource Ui34DB027A092F}" Style="{StaticResource Hint}"/>
       </StackPanel></TabItem>
-      <TabItem><TabItem.Header><TextBlock Text="Приложение" Foreground="#15283A" Margin="8,5"/></TabItem.Header><StackPanel>
-        <TextBlock Text="Главный экран" Style="{StaticResource Label}"/><CheckBox Content="Показывать журнал событий" IsChecked="{Binding ShowLog}" Foreground="#E5EEF6" Margin="0,8"/><CheckBox Content="Уменьшить анимацию волны" IsChecked="{Binding ReduceMotion}" Foreground="#E5EEF6" Margin="0,8"/>
-        <TextBlock Text="Волна реагирует на уровень микрофона и голосового ответа. Журнал хранится только до закрытия приложения." Style="{StaticResource Hint}"/>
-        <TextBlock Text="Диагностика" Style="{StaticResource Label}"/><Button Content="Перезапустить голосовой модуль" Click="RestartClick" HorizontalAlignment="Left" Margin="0,4,0,0"/>
-        <TextBlock Text="Используй, если распознавание или голос перестали отвечать. Настройки сохраняются." Style="{StaticResource Hint}"/>
-        <TextBlock Text="JARVIS 0.7 · локальный голосовой помощник" Foreground="#69859E" FontSize="12" Margin="0,28,0,0"/>
-      </StackPanel></TabItem>
+      <TabItem><TabItem.Header><TextBlock Text="{DynamicResource Ui26B855CC1660}" Foreground="#15283A" Margin="8,5"/></TabItem.Header><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel>
+        <TextBlock Text="{DynamicResource Ui9089A73112CC}" Style="{StaticResource Label}"/>
+        <ComboBox ItemsSource="{Binding Languages}" SelectedValuePath="Id" SelectedValue="{Binding InterfaceLanguage}" ItemTemplate="{StaticResource ChoiceTemplate}" Padding="9"/>
+        <TextBlock Text="{DynamicResource UiD4EDE92BD67C}" Style="{StaticResource Hint}"/>
+        <TextBlock Text="{DynamicResource Ui39293E2ABA62}" Style="{StaticResource Label}"/>
+        <CheckBox Content="{DynamicResource Ui810F7494EF7E}" IsChecked="{Binding StartWithWindows}" Foreground="#E5EEF6" Margin="0,8"/>
+        <CheckBox Content="{DynamicResource UiFCF22584553F}" IsChecked="{Binding StartInTray}" Foreground="#E5EEF6" Margin="0,8"/>
+        <CheckBox Content="{DynamicResource UiFD4B5D5A5B2F}" IsChecked="{Binding ListenOnStartup}" Foreground="#E5EEF6" Margin="0,8"/>
+        <TextBlock Text="{DynamicResource Ui1D94FB5F8987}" Style="{StaticResource Hint}"/>
+        <TextBlock Text="{DynamicResource Ui8813171BCC39}" Style="{StaticResource Hint}"/>
+        <TextBlock Text="{DynamicResource UiD8D79B0695EE}" Style="{StaticResource Label}"/><CheckBox Content="{DynamicResource UiC23F0B5C92A3}" IsChecked="{Binding ShowLog}" Foreground="#E5EEF6" Margin="0,8"/><CheckBox Content="{DynamicResource Ui92A8E45E91A6}" IsChecked="{Binding ReduceMotion}" Foreground="#E5EEF6" Margin="0,8"/>
+        <TextBlock Text="{DynamicResource Ui34FE1F3912CE}" Style="{StaticResource Hint}"/>
+        <TextBlock Text="{DynamicResource UiDA4DA4E3527C}" Style="{StaticResource Label}"/><Button Content="{DynamicResource Ui64648201372F}" Click="RestartClick" HorizontalAlignment="Left" Margin="0,4,0,0"/>
+        <TextBlock Text="{DynamicResource Ui9BE0D83D1E15}" Style="{StaticResource Hint}"/>
+        <TextBlock Text="{DynamicResource UiD9E94574684B}" Foreground="#69859E" FontSize="12" Margin="0,28,0,0"/>
+      </StackPanel></ScrollViewer></TabItem>
     </TabControl>
     <TextBlock Grid.Row="2" Text="{Binding Runtime.Status}" Foreground="#91ACBF" FontSize="12" Margin="0,14,0,14" MinHeight="32"/>
-    <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right"><Button Content="Отмена" Click="CancelClick"/><Button Content="Сохранить" Click="SaveClick" Background="#64DCC6" Foreground="#0A2922" FontWeight="SemiBold" IsEnabled="{Binding Runtime.CanSpeak}" Margin="0"/></StackPanel>
+    <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right"><Button Content="{DynamicResource Ui8FBE9B75CBDF}" Click="CancelClick"/><Button Content="{DynamicResource UiB4D30CAE5289}" Click="SaveClick" Background="#64DCC6" Foreground="#0A2922" FontWeight="SemiBold" IsEnabled="{Binding Runtime.CanSpeak}" Margin="0"/></StackPanel>
   </Grid>
 </Window>

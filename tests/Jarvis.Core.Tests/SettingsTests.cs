@@ -9,13 +9,14 @@ public class SettingsTests
     public void InvalidValuesCannotReachAudioEngine()
     {
         var settings = new AssistantSettings { Volume = 4, SpeechRate = double.NaN, RobotAmount = -1,
-            Voice = "../../other", VoiceStyle = "shell", CommandWaitSeconds = 100 }.Normalize();
+            Voice = "../../other", VoiceStyle = "shell", CommandWaitSeconds = 100, InterfaceLanguage = "unsupported" }.Normalize();
         Assert.Equal(1, settings.Volume);
         Assert.Equal(1, settings.SpeechRate);
         Assert.Equal(0, settings.RobotAmount);
         Assert.Equal("denis", settings.Voice);
         Assert.Equal("robot", settings.VoiceStyle);
         Assert.Equal(15, settings.CommandWaitSeconds);
+        Assert.Equal("ru", settings.InterfaceLanguage);
     }
 
     [Fact]
@@ -26,7 +27,8 @@ public class SettingsTests
         var file = Path.Combine(directory, "settings.json");
         try
         {
-            var expected = new AssistantSettings { WakeMode = true, Voice = "dmitri", Volume = 0.4, CommandWaitSeconds = 12 };
+            var expected = new AssistantSettings { WakeMode = true, Voice = "dmitri", Volume = 0.4, CommandWaitSeconds = 12,
+                ListenOnStartup = true, StartInTray = false, InterfaceLanguage = "en" };
             var store = new SettingsStore(file);
             store.Save(expected);
             Assert.Equal(expected, new SettingsStore(file).Load().Settings);
@@ -35,5 +37,14 @@ public class SettingsTests
             Assert.Equal("broken", File.ReadAllText(file));
         }
         finally { File.Delete(file); Directory.Delete(directory); }
+    }
+
+    [Fact]
+    public void OlderSettingsDoNotEnableTheMicrophoneOnStartup()
+    {
+        var settings = System.Text.Json.JsonSerializer.Deserialize<AssistantSettings>("{\"WakeMode\":true}")!.Normalize();
+        Assert.True(settings.WakeMode);
+        Assert.False(settings.ListenOnStartup);
+        Assert.True(settings.StartInTray);
     }
 }

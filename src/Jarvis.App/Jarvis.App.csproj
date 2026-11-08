@@ -5,8 +5,14 @@
     <UseWPF>true</UseWPF>
     <AssemblyName>Jarvis</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\jarvis.ico</ApplicationIcon>
+    <AppHostDotNetSearch>AppRelative;EnvironmentVariable;Global</AppHostDotNetSearch>
+    <AppHostRelativeDotNet>..\..\.tools\dotnet</AppHostRelativeDotNet>
   </PropertyGroup>
   <ItemGroup>
+    <Resource Include="Assets\jarvis.ico" />
+    <EmbeddedResource Include="Localization\strings.json" LogicalName="Jarvis.Localization.strings.json" />
+    <FrameworkReference Include="Microsoft.WindowsDesktop.App.WindowsForms" />
     <ProjectReference Include="..\Jarvis.Core\Jarvis.Core.csproj" />
     <PackageReference Include="NAudio" Version="2.2.1" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />

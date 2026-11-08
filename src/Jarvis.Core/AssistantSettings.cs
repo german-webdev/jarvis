@@ -16,10 +16,14 @@ public sealed record AssistantSettings
     public int CommandWaitSeconds { get; init; } = 8;
     public bool ShowLog { get; init; } = true;
     public bool ReduceMotion { get; init; }
+    public bool ListenOnStartup { get; init; }
+    public bool StartInTray { get; init; } = true;
+    public string InterfaceLanguage { get; init; } = "ru";
 
     public AssistantSettings Normalize() => this with
     {
         Version = 1,
+        InterfaceLanguage = InterfaceLanguage is "ru" or "en" ? InterfaceLanguage : "ru",
         MusicTargetId = string.IsNullOrWhiteSpace(MusicTargetId) || MusicTargetId.Length > 512 ? null : MusicTargetId,
         Voice = Voice is "denis" or "dmitri" ? Voice : "denis",
         VoiceStyle = VoiceStyle is "natural" or "robot" or "radio" ? VoiceStyle : "robot",

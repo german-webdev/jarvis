@@ -34,33 +34,33 @@ public partial class CatalogWindow : Window
     private async void ScanClick(object sender, RoutedEventArgs e)
     {
         if (_scanning) return;
-        _scanning = true; ScanButton.IsEnabled = false; StatusText.Text = "Ищу приложения Windows и установленные игры Steam…";
+        _scanning = true; ScanButton.IsEnabled = false; StatusText.Text = Ui.Text("Ищу приложения Windows и установленные игры Steam…");
         try
         {
             var result = await AppDiscovery.ScanAsync().WaitAsync(TimeSpan.FromSeconds(30));
             if (!IsLoaded) return;
             var known = _entries.Select(x => x.Target.Id).ToHashSet(); int added = 0;
             foreach (var target in result.Targets) if (known.Add(target.Id)) { _entries.Add(new(target)); added++; }
-            StatusText.Text = $"Найдено {result.Targets.Count}. Добавлено {added}. Всего в каталоге {_entries.Count}. " + string.Join(" ", result.Warnings.Distinct());
+            StatusText.Text = Ui.Format("Найдено {0}. Добавлено {1}. Всего в каталоге {2}. ", result.Targets.Count, added, _entries.Count) + string.Join(" ", result.Warnings.Distinct().Select(Ui.Text));
         }
-        catch (Exception) { StatusText.Text = "Поиск не завершился. Можно повторить или добавить нужное приложение вручную."; }
+        catch (Exception) { StatusText.Text = Ui.Text("Поиск не завершился. Можно повторить или добавить нужное приложение вручную."); }
         finally { _scanning = false; ScanButton.IsEnabled = true; }
     }
     private void AddClick(object sender, RoutedEventArgs e)
     {
-        var picker = new OpenFileDialog { Filter = "Приложение или ярлык|*.exe;*.lnk", CheckFileExists = true, DereferenceLinks = false };
+        var picker = new OpenFileDialog { Filter = Ui.Text("Приложение или ярлык|*.exe;*.lnk"), CheckFileExists = true, DereferenceLinks = false };
         if (picker.ShowDialog(this) != true) return;
         var file = Path.GetFullPath(picker.FileName);
         var id = "file:" + file.ToLowerInvariant();
-        if (_entries.Any(x => x.Target.Id == id)) { StatusText.Text = "Этот файл уже есть в каталоге."; return; }
+        if (_entries.Any(x => x.Target.Id == id)) { StatusText.Text = Ui.Text("Этот файл уже есть в каталоге."); return; }
         var target = new LaunchTarget(id, Path.GetFileNameWithoutExtension(file), Path.GetExtension(file).Equals(".lnk", StringComparison.OrdinalIgnoreCase) ? "shortcut" : "exe", file, "Добавлено вручную", [], true);
-        _entries.Add(new(target)); SearchBox.Clear(); StatusText.Text = "Добавлено. При желании укажи своё название и нажми «Сохранить».";
+        _entries.Add(new(target)); SearchBox.Clear(); StatusText.Text = Ui.Text("Добавлено. При желании укажи своё название и нажми «Сохранить».");
     }
     private void SaveClick(object sender, RoutedEventArgs e)
     {
         Entries.CommitEdit(DataGridEditingUnit.Cell, true); Entries.CommitEdit(DataGridEditingUnit.Row, true);
         try { _runtime.SaveCatalog(_entries.Select(x => x.Capture())); DialogResult = true; }
-        catch (Exception ex) { StatusText.Text = "Не удалось сохранить: " + ex.Message; }
+        catch (Exception ex) { StatusText.Text = Ui.Text("Не удалось сохранить: ") + Ui.Text(ex.Message); }
     }
     private void CancelClick(object sender, RoutedEventArgs e) => DialogResult = false;
 }
@@ -68,7 +68,7 @@ public sealed class CatalogEntry(LaunchTarget target)
 {
     public LaunchTarget Target { get; } = target;
     public string Name => Target.Name;
-    public string Source => Target.Source;
+    public string Source => Ui.Text(Target.Source);
     public string AutomaticText => string.Join("; ", Target.AutomaticAliases);
     public bool Enabled { get; set; } = target.Enabled;
     public string AliasesText { get; set; } = string.Join("; ", target.Aliases ?? []);

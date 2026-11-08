@@ -28,18 +28,16 @@
           <TextBlock Text="{DynamicResource Ui2ADE58981DA9}" Style="{StaticResource Hint}"/>
         </StackPanel>
         <StackPanel x:Name="SubscriptionPanel" Visibility="Collapsed">
-          <TextBlock Text="{DynamicResource Ui104E43FC7C85}" Style="{StaticResource Label}"/>
-          <DockPanel><Button Content="{DynamicResource UiEA9BDFC4CADC}" Click="BrowseClick" DockPanel.Dock="Right" Margin="10,0,0,0" Padding="10,7"/><TextBox x:Name="CliBox" Padding="8"/></DockPanel>
-          <TextBlock Text="{DynamicResource UiE985DCAD7928}" Style="{StaticResource Hint}"/>
-          <WrapPanel Margin="0,12,0,0"><Button Content="{DynamicResource UiB972EB6287AC}" Click="SignInClick" Padding="12,9"/><Button Content="{DynamicResource Ui3364AF49D2BA}" Click="SignOutClick" Padding="12,9"/></WrapPanel>
-          <TextBlock Text="{DynamicResource Ui9CBD7ADB296E}" Style="{StaticResource Hint}"/>
+          <TextBlock x:Name="SubscriptionHint" Style="{StaticResource Hint}"/>
+          <WrapPanel Margin="0,12,0,0"><Button x:Name="SignInButton" Content="{DynamicResource UiB972EB6287AC}" Click="SignInClick" Padding="12,9"/><Button Content="{DynamicResource Ui3364AF49D2BA}" Click="SignOutClick" Padding="12,9"/></WrapPanel>
+          <Border Background="#20364A" Padding="12" Margin="0,10,0,8" CornerRadius="6"><TextBlock x:Name="AuthStatus" TextWrapping="Wrap" Foreground="#64DCC6"/></Border>
         </StackPanel>
         <TextBlock Text="{DynamicResource UiF3BDF7CCE355}" Style="{StaticResource Label}"/><ComboBox x:Name="ModelBox" IsEditable="True" Padding="8"/>
         <TextBlock Text="{DynamicResource Ui4F34F516B97B}" Style="{StaticResource Hint}"/>
         <WrapPanel Margin="0,14,0,8"><Button x:Name="ModelsButton" Content="{DynamicResource UiB00CF3C8FBEC}" Click="ModelsClick" Padding="12,9"/><Button Content="{DynamicResource UiD6D828DC8806}" Click="CheckClick" Padding="12,9"/></WrapPanel>
       </StackPanel></ScrollViewer>
     </Grid>
-    <DockPanel Grid.Row="3" Margin="0,14,0,14"><Button x:Name="CancelOperation" Content="{DynamicResource Ui0343402BA682}" Click="CancelOperationClick" Visibility="Collapsed" DockPanel.Dock="Right" Margin="12,0,0,0"/><TextBlock x:Name="StatusText" Text="{DynamicResource Ui58A243344BEE}" Foreground="#9AB2C8" TextWrapping="Wrap" VerticalAlignment="Center"/></DockPanel>
+    <DockPanel Grid.Row="3" Margin="0,14,0,14"><Button x:Name="ReopenBrowser" Content="{DynamicResource UiF596E732224A}" Click="ReopenBrowserClick" Visibility="Collapsed" DockPanel.Dock="Right" Margin="10,0,0,0"/><Button x:Name="CancelOperation" Content="{DynamicResource Ui0343402BA682}" Click="CancelOperationClick" Visibility="Collapsed" DockPanel.Dock="Right" Margin="12,0,0,0"/><TextBlock x:Name="StatusText" Text="{DynamicResource Ui58A243344BEE}" Foreground="#9AB2C8" TextWrapping="Wrap" VerticalAlignment="Center"/></DockPanel>
     <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right"><Button Content="{DynamicResource UiA7A4033657E8}" Click="CloseClick"/><Button x:Name="SaveButton" Content="{DynamicResource UiB4D30CAE5289}" Click="SaveClick" Background="#64DCC6" Foreground="#092820" Margin="0"/></StackPanel>
   </Grid>
 </Window>

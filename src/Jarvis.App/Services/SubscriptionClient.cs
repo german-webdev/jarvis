@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Jarvis.Core;
 
 namespace Jarvis.App.Services;
@@ -26,7 +27,7 @@ public sealed class SubscriptionClient(string sessionRoot)
     {
         connection.Validate();
         var exe = string.IsNullOrWhiteSpace(connection.CliPath) ? FindExecutable(connection.Provider) : connection.CliPath;
-        if (exe == null || !File.Exists(exe)) throw new InvalidDataException("Официальный клиент не найден. Установи Codex CLI или Claude Code и укажи путь к .exe.");
+        if (exe == null || !File.Exists(exe)) throw new InvalidDataException("Компонент входа Claude Code не установлен. Установи его с официального сайта Claude; JARVIS найдёт его автоматически.");
         var home = Path.GetFullPath(Path.Combine(sessionRoot, connection.Id));
         if (!home.StartsWith(Path.GetFullPath(sessionRoot).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException("Неверный каталог подключения.");
@@ -66,9 +67,9 @@ public sealed class SubscriptionClient(string sessionRoot)
         catch (JsonException) { return false; }
     }
 
-    public async Task SignInAsync(AiConnection connection, CancellationToken token)
+    public async Task SignInAsync(AiConnection connection, CancellationToken token, Action<Uri>? browserLink = null)
     {
-        var result = await RunAsync(CreateStart(connection, connection.Provider == "chatgpt" ? ["login"] : ["auth", "login"]), null, token);
+        var result = await RunAsync(CreateStart(connection, connection.Provider == "chatgpt" ? ["login"] : ["auth", "login"]), null, token, browserLink);
         if (result.Code != 0 || !await IsSignedInAsync(connection, token))
             throw new InvalidDataException("Вход по подписке не завершён. Проверь вход в браузере и доступность официального клиента.");
     }
@@ -128,16 +129,26 @@ public sealed class SubscriptionClient(string sessionRoot)
         return HttpAiClient.CleanAnswer(answer);
     }
 
-    private static async Task<(int Code, string Output, string Error)> RunAsync(ProcessStartInfo start, string? input, CancellationToken token)
+    public static Uri? AuthorizationLink(string line)
+    {
+        var clean = Regex.Replace(line, @"\x1B\[[0-?]*[ -/]*[@-~]", "");
+        foreach (Match match in Regex.Matches(clean, @"https://[^\s<>""']+"))
+            if (Uri.TryCreate(match.Value, UriKind.Absolute, out var uri) && uri.IsDefaultPort && uri.UserInfo.Length == 0
+                && uri.Host is "claude.ai" or "console.anthropic.com" or "platform.claude.com" or "auth.claude.com"
+                && uri.AbsolutePath.Contains("authorize", StringComparison.Ordinal)) return uri;
+        return null;
+    }
+
+    private static async Task<(int Code, string Output, string Error)> RunAsync(ProcessStartInfo start, string? input, CancellationToken token, Action<Uri>? browserLink = null)
     {
         using var process = Process.Start(start) ?? throw new InvalidDataException("Не удалось запустить официальный клиент.");
         using var registration = token.Register(() => StopProcess(process));
         try
         {
-            var output = ReadBoundedAsync(process.StandardOutput, token);
-            var error = ReadBoundedAsync(process.StandardError, token);
+            var output = ReadBoundedAsync(process.StandardOutput, token, browserLink);
+            var error = ReadBoundedAsync(process.StandardError, token, browserLink);
             if (input != null) await process.StandardInput.WriteAsync(input.AsMemory(), token);
-            process.StandardInput.Close();
+            if (browserLink == null) process.StandardInput.Close();
             await process.WaitForExitAsync(token);
             return (process.ExitCode, await output, await error);
         }
@@ -150,15 +161,26 @@ public sealed class SubscriptionClient(string sessionRoot)
         catch (Exception error) when (error is InvalidOperationException or Win32Exception) { }
     }
 
-    private static async Task<string> ReadBoundedAsync(StreamReader reader, CancellationToken token)
+    private static async Task<string> ReadBoundedAsync(StreamReader reader, CancellationToken token, Action<Uri>? browserLink)
     {
         var result = new StringBuilder();
         var block = new char[4096];
+        var line = new StringBuilder();
         int count;
         while ((count = await reader.ReadAsync(block, token)) > 0)
         {
             // Drain the pipe even if a verbose client exceeds the retained output limit.
             if (result.Length + count <= 2_000_000) result.Append(block, 0, count);
+            if (browserLink != null)
+                foreach (var c in block.Take(count))
+                {
+                    if (c == '\n')
+                    {
+                        var uri = AuthorizationLink(line.ToString()); line.Clear();
+                        if (uri != null) browserLink(uri);
+                    }
+                    else if (line.Length < 32768) line.Append(c);
+                }
         }
         return result.ToString();
     }

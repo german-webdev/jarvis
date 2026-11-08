@@ -86,6 +86,11 @@ public class WindowLifecycleTests
                     ((Button)aiWindow.FindName("SaveButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                     Assert.Null(runtime.Ai.Configuration.Active);
                     Assert.False(Directory.Exists(Path.Combine(root, "data", "ai-sessions")));
+                    Assert.Null(aiWindow.FindName("CliBox"));
+                    ((ComboBox)aiWindow.FindName("ProviderBox")).SelectedValue = "chatgpt";
+                    Assert.Equal("Continue with ChatGPT", ((Button)aiWindow.FindName("SignInButton")).Content);
+                    Assert.Equal(Visibility.Visible, ((Button)aiWindow.FindName("ModelsButton")).Visibility);
+                    Assert.False(Directory.Exists(Path.Combine(root, "data", "chatgpt-accounts")));
                     aiWindow.Close();
                     runtime.ApplySettings(runtime.Settings with { InterfaceLanguage = "ru" });
                     Assert.Equal("JARVIS · Помощник", window.Title);

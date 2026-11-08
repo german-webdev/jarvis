@@ -11,6 +11,8 @@ public sealed class AiService : IDisposable
     private readonly HttpClient _http = new(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(100) };
     public AiConnectionStore Store { get; }
     public SubscriptionClient Subscriptions { get; }
+    public ChatGptPlanClient ChatGptClient { get; }
+    public ChatGptSignIn ChatGpt { get; }
     public AiConfiguration Configuration { get; private set; }
     public string? LoadWarning { get; }
 
@@ -19,11 +21,14 @@ public sealed class AiService : IDisposable
         Store = new(Path.Combine(root, "data", "ai-connections.json"));
         (Configuration, LoadWarning) = Store.Load();
         Subscriptions = new(Path.Combine(root, "data", "ai-sessions"));
+        ChatGptClient = new(_http);
+        ChatGpt = new(Path.Combine(root, "data", "chatgpt-accounts"), ChatGptClient);
     }
 
     public void Save(AiConfiguration settings) { Store.Save(settings); Configuration = settings; }
-    public Task<string[]> ModelsAsync(AiConnection connection, CancellationToken token) =>
-        new HttpAiClient(_http).ModelsAsync(connection, Unprotect(connection.ProtectedApiKey), token);
+    public async Task<string[]> ModelsAsync(AiConnection connection, CancellationToken token) => connection.Provider == "chatgpt"
+        ? await ChatGptClient.ModelsAsync(await ChatGpt.ReadyAsync(connection, token), token)
+        : await new HttpAiClient(_http).ModelsAsync(connection, Unprotect(connection.ProtectedApiKey), token);
 
     public async Task<SkillResult> AskAsync(string question, CancellationToken token)
     {
@@ -33,7 +38,9 @@ public sealed class AiService : IDisposable
         {
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
             timeout.CancelAfter(TimeSpan.FromSeconds(110));
-            var answer = selected.IsSubscription
+            var answer = selected.Provider == "chatgpt"
+                ? await ChatGptClient.AskAsync(await ChatGpt.ReadyAsync(selected, timeout.Token), selected.Model, question, timeout.Token)
+                : selected.IsSubscription
                 ? await Subscriptions.AskAsync(selected, question, timeout.Token)
                 : await new HttpAiClient(_http).AskAsync(selected, Unprotect(selected.ProtectedApiKey), question, timeout.Token);
             return new(true, answer);

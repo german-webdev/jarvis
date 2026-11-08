@@ -1,0 +1,14 @@
+.tools/
+.venv/
+models/
+work/
+artifacts/
+**/bin/
+**/obj/
+**/__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.user
+*.suo
+.env
+*.log

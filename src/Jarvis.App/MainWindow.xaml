@@ -1,0 +1,46 @@
+<Window x:Class="Jarvis.App.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="JARVIS · Голосовой прототип" Width="820" Height="830" MinWidth="690" MinHeight="700"
+        Background="#0C1522" FontFamily="Segoe UI" FontSize="14" WindowStartupLocation="CenterScreen">
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel Margin="32,26">
+      <DockPanel>
+        <StackPanel><TextBlock Text="J A R V I S" FontSize="29" FontWeight="SemiBold"/><TextBlock Text="Голосовой прототип 0.1" Foreground="#91A8BC" Margin="0,4,0,0"/></StackPanel>
+        <Border Background="#123B36" CornerRadius="6" Padding="12,7" VerticalAlignment="Top" HorizontalAlignment="Right"><TextBlock Text="ЛОКАЛЬНО · CPU" Foreground="#8CE4CC" FontSize="12"/></Border>
+      </DockPanel>
+      <Border Background="#142437" CornerRadius="12" Padding="20" Margin="0,24,0,22">
+        <StackPanel>
+          <TextBlock Text="{Binding Status}" FontSize="18" FontWeight="SemiBold" MinHeight="48"/>
+          <ProgressBar Value="{Binding Level, Mode=OneWay}" Maximum="100" Height="5" Margin="0,12,0,6" Background="#25394D" Foreground="#70DDCA" BorderThickness="0"/>
+          <TextBlock Text="Уровень микрофона · звук не сохраняется" FontSize="12" Foreground="#91A8BC"/>
+        </StackPanel>
+      </Border>
+      <TextBlock Text="Микрофон" FontWeight="SemiBold" Margin="0,0,0,8"/>
+      <DockPanel>
+        <Button DockPanel.Dock="Right" Content="Обновить" Click="RefreshClick" IsEnabled="{Binding CanConfigure}" Margin="10,0,0,0"/>
+        <ComboBox ItemsSource="{Binding Microphones}" SelectedItem="{Binding SelectedMicrophone}" IsEnabled="{Binding CanConfigure}" Padding="10" VerticalContentAlignment="Center" AutomationProperties.Name="Выбор микрофона">
+          <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Name}" Foreground="#152437"/></DataTemplate></ComboBox.ItemTemplate>
+        </ComboBox>
+      </DockPanel>
+      <CheckBox Content="Ожидать имя «Джарвис» (экспериментально)" IsChecked="{Binding WakeMode}" IsEnabled="{Binding CanConfigure}" Foreground="#E9F2F7" Margin="0,18,0,18"/>
+      <WrapPanel>
+        <Button Content="Слушать" Background="#66DDC4" Foreground="#092820" FontWeight="SemiBold" IsEnabled="{Binding CanListen}" Click="ListenClick"/>
+        <Button Content="Стоп" Click="StopClick"/>
+        <Button Content="Проверить голос" IsEnabled="{Binding CanSpeak}" Click="VoiceClick"/>
+      </WrapPanel>
+      <TextBlock Text="Нажми «Слушать» и скажи: «Джарвис, открой браузер». Без ожидания имени можно просто сказать «Открой браузер». Пауза завершит запись. Esc — остановить." Foreground="#91A8BC" FontSize="12" Margin="0,12,0,22"/>
+      <Border Background="#111F30" CornerRadius="10" Padding="18">
+        <StackPanel>
+          <TextBlock Text="ТЫ СКАЗАЛ" Foreground="#91A8BC" FontSize="11"/>
+          <TextBlock Text="{Binding Transcript}" FontSize="19" Margin="0,6,0,16"/>
+          <TextBlock Text="ОТВЕТ ДЖАРВИСА" Foreground="#91A8BC" FontSize="11"/>
+          <TextBlock Text="{Binding Reply}" FontSize="16" Margin="0,6,0,0"/>
+        </StackPanel>
+      </Border>
+      <TextBlock Text="Ход выполнения" FontWeight="SemiBold" Margin="0,20,0,8"/>
+      <ListBox ItemsSource="{Binding History}" Height="65" Background="#0C1522" Foreground="#A7BDCD" BorderThickness="0" FontSize="12" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+        <ListBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding}" Foreground="#A7BDCD" FontSize="12"/></DataTemplate></ListBox.ItemTemplate>
+      </ListBox>
+      <Button Content="Перезапустить модуль" HorizontalAlignment="Left" Click="RestartClick" Margin="0,14,0,0" FontSize="12"/>
+    </StackPanel>
+  </ScrollViewer>
+</Window>

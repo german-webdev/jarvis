@@ -136,11 +136,15 @@ def main():
                 (ROOT / "work" / f"voice-denis-{style}.wav").write_bytes(voice_wav)
             results["denis_presets"] = ["natural", "robot", "radio"]
             results["name_variants"] = []
+            failures = []
             for phrase, expected in [("Запусти сабнавтику.", "сабнавтику"), ("Шестую.", "шестую"),
                                      ("Закрой телеграм.", "закрой телеграм"),
                                      ("Открой папку с сабнавтикой.", "открой папку с сабнавтикой"), ("Пауза.", "пауза"),
                                      ("Запусти Яндекс Музыку.", "яндекс музыку"), ("Запусти ворд.", ("ворд", "word", "ward")),
-                                     ("Запусти эксель.", ("эксель", "экссель", "excel")), ("Дальше.", "дальше"), ("Назад.", "назад")]:
+                                     ("Запусти эксель.", ("эксель", "экссель", "excel")), ("Дальше.", "дальше"), ("Назад.", "назад"),
+                                     ("Тише.", "тише"), ("Громче.", "громче"),
+                                     ("Сделай тише.", ("сделай тише", "делай тише")), ("Сделай громче.", ("сделай громче", "делай громче")),
+                                     ("Сделай потише.", ("сделай потише", "делай потише")), ("Сделай погромче.", ("сделай погромче", "делай погромче"))]:
                 send("synthesize", session=10, text=phrase)
                 sample = pcm16k(base64.b64decode(expect("speech")["wav"]))
                 send("start", session=11, mode="command", wait_seconds=10,
@@ -149,12 +153,15 @@ def main():
                 expect("listening")
                 stream(sample + bytes(32000), 11)
                 recognized = expect("transcript")
-                assert any(word in recognized["text"].lower() for word in (expected if isinstance(expected, tuple) else (expected,))), recognized
+                if not any(word in recognized["text"].lower() for word in (expected if isinstance(expected, tuple) else (expected,))):
+                    failures.append({"spoken": phrase, "recognized": recognized["text"]})
                 results["name_variants"].append(recognized)
+            results["recognition_failures"] = failures
             (ROOT / "work" / "speech-smoke.json").write_text(
                 json.dumps(results, indent=2, ensure_ascii=False), encoding="utf-8"
             )
             print(json.dumps(results, indent=2, ensure_ascii=False))
+            assert not failures, failures
         finally:
             if process.poll() is None:
                 send("quit")

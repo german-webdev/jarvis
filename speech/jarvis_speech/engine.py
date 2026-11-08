@@ -67,7 +67,7 @@ class Engine:
         self.choosing = False
 
     def set_vocabulary(self, text="", choosing=False):
-        self.vocabulary = "браузер, Джарвис, скриншот, громкость, телеграм, стим, иксбокс, пауза, продолжи, закрой, папку, каталог, переключись, сверни, " + str(text)[:1500]
+        self.vocabulary = "браузер, Джарвис, скриншот, громкость, тише, громче, стоп, останови, телеграм, стим, иксбокс, пауза, продолжи, закрой, папку, каталог, переключись, сверни, " + str(text)[:1500]
         self.choosing = bool(choosing)
 
     def wake_boundary(self, pcm: bytes) -> int | None:
@@ -101,7 +101,7 @@ class Engine:
             condition_on_previous_text=False,
             vad_filter=False,
             initial_prompt=("Выбор игры: первую, вторую, третью, четвертую, пятую, шестую, седьмую, восьмую, девятую, десятую. Вариант один. Вариант два. Отмена."
-                            if self.choosing else "Джарвис. Открой браузер. Запусти приложение. Закрой окно. Открой папку. Пауза. Продолжи. Дальше. Назад. Отмена."),
+                            if self.choosing else "Джарвис. Открой браузер. Запусти приложение. Закрой окно. Открой папку. Пауза. Продолжи. Дальше. Назад. Тише. Громче. Стоп. Отмена."),
             hotwords=self.vocabulary,
             no_speech_threshold=0.6,
         )

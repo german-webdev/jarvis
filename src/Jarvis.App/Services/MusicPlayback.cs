@@ -23,6 +23,16 @@ public sealed class MusicPlayback(Func<IReadOnlyList<LaunchTarget>> catalog, Fun
         var sessions = manager.GetSessions().ToArray();
         var choice = MusicSelection.Choose(sessions.Select(s => Describe(s, catalog())).ToArray(), catalog(), preferred());
         if (choice.SourceId == null) return new(false, choice.Error ?? "Не удалось выбрать плеер.");
+        if (request.Intent is Intent.MusicVolumeUp or Intent.MusicVolumeDown)
+        {
+            var selected = Describe(sessions.Single(s => s.SourceAppUserModelId == choice.SourceId), catalog());
+            var target = catalog().FirstOrDefault(t => t.Enabled && t.Id == selected.CatalogId);
+            if (target == null) return new(false, "Не удалось связать плеер с приложением. Выбери музыкальное приложение в настройках.");
+            string? executable = target.Kind == "exe" ? target.Target : null;
+            if (target.Kind == "app") executable = (await AppLocations.ExecutablesAsync(token)).GetValueOrDefault(target.Target);
+            if (executable == null) return new(false, "Громкость этого плеера пока недоступна. Общую громкость можно изменить командой «систему тише» или «систему громче».");
+            return PlayerVolume.Change(executable, target.Name, request.Intent == Intent.MusicVolumeUp ? 0.1f : -0.1f, token);
+        }
         return await MediaControl.ApplyAsync(sessions.Single(s => s.SourceAppUserModelId == choice.SourceId), request.Intent, token);
     }
 

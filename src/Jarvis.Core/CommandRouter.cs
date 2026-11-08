@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 namespace Jarvis.Core;
 
 public enum Intent { OpenBrowser, Cancel, Unknown, LaunchTarget, Screenshot, OpenScreenshots, VolumeUp, VolumeDown, SetVolume, Mute, Unmute, Time, Date, Help,
-    CloseTarget, FocusTarget, MinimizeWindow, CloseWindow, OpenTargetFolder, MediaPause, MediaPlay, MediaNext, MediaPrevious, StartMusic }
+    CloseTarget, FocusTarget, MinimizeWindow, CloseWindow, OpenTargetFolder, MediaPause, MediaPlay, MediaNext, MediaPrevious, StartMusic, MusicVolumeUp, MusicVolumeDown }
 public record CommandRequest(Intent Intent, string? TargetId = null, int? Value = null, string? Explanation = null, string[]? CandidateIds = null, Intent? CandidateIntent = null);
 
 public static partial class CommandRouter
@@ -15,6 +15,8 @@ public static partial class CommandRouter
         if (text.Length > 500 || Regex.IsMatch(text, @"[-−]\s*\d")) return new(Intent.Unknown);
         var phrase = WakePrefix().Replace(Normalize(text), "");
         phrase = Politeness().Replace(phrase, "").Trim();
+        // Observed ASR omission in volume commands; do not rewrite arbitrary application names.
+        phrase = Regex.Replace(phrase, @"^делай (?=(?:по)?(?:тише|тиши|громче|громчи)$)", "сделай ");
         if (text.Contains('?') && phrase is not ("сколько времени" or "который час" or "какое сегодня число" or "что ты умеешь")) return new(Intent.Unknown);
         if (phrase is "отмена" or "отмени") return new(Intent.Cancel);
         if (OpenPhrase().IsMatch(phrase)) return new(Intent.OpenBrowser);
@@ -31,8 +33,12 @@ public static partial class CommandRouter
         {
             "сделай скриншот" or "сделай снимок экрана" or "сними экран" => Intent.Screenshot,
             "открой скриншоты" or "открой папку скриншотов" => Intent.OpenScreenshots,
-            "громче" or "сделай громче" or "увеличь громкость" => Intent.VolumeUp,
-            "тише" or "сделай тише" or "уменьши громкость" => Intent.VolumeDown,
+            "громче" or "погромче" or "сделай громче" or "сделай погромче" or "увеличь громкость" or "музыку громче" or "сделай музыку громче" or "сделай музыку погромче" or "громче музыку"
+                or "громчи" or "погромчи" or "сделай громчи" or "сделай погромчи" => Intent.MusicVolumeUp,
+            "тише" or "потише" or "сделай тише" or "сделай потише" or "уменьши громкость" or "музыку тише" or "сделай музыку тише" or "сделай музыку потише" or "тише музыку"
+                or "тиши" or "потиши" or "сделай тиши" or "сделай потиши" => Intent.MusicVolumeDown,
+            "систему громче" or "сделай систему громче" => Intent.VolumeUp,
+            "систему тише" or "сделай систему тише" => Intent.VolumeDown,
             "выключи звук" or "отключи звук" => Intent.Mute,
             "включи звук" or "верни звук" => Intent.Unmute,
             "сколько времени" or "который час" or "скажи время" => Intent.Time,

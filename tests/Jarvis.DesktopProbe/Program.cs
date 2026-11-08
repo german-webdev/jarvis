@@ -114,6 +114,8 @@ public static class Program
                 var pauseAgain = await MediaControl.ApplyAsync(session, Intent.MediaPause, default);
                 var play = await MediaControl.ApplyAsync(session, Intent.MediaPlay, default);
                 report["pause"] = pause; report["pause_again"] = pauseAgain; report["play"] = play;
+                bool playerVolume = await VerifyPlayerVolume(catalog, executable, children[0].Id);
+                report["player_volume_step_limits_and_system_unchanged"] = playerVolume;
                 await MediaControl.ApplyAsync(session, Intent.MediaNext, default);
                 await MediaControl.ApplyAsync(session, Intent.MediaPrevious, default);
                 await Task.Delay(500);
@@ -131,7 +133,7 @@ public static class Program
                 report["close"] = close;
                 var stale = await windows.ExecuteAsync(new(Intent.CloseTarget, normal.Id), default);
                 report["stale_target_rejected"] = !stale.Verified;
-                bool success = focusAccurate && minimized.Verified && restored.Verified && pause.Verified && pauseAgain.Verified && play.Verified && tracks
+                bool success = focusAccurate && minimized.Verified && restored.Verified && pause.Verified && pauseAgain.Verified && play.Verified && tracks && playerVolume
                     && guardedStillOpen && !closeGuarded.Verified && close.Verified && !stale.Verified;
                 report["success"] = success; exit = success ? 0 : 1;
             }
@@ -144,6 +146,38 @@ public static class Program
             }
         };
         app.Run(); return exit;
+    }
+    private static async Task<bool> VerifyPlayerVolume(IReadOnlyList<LaunchTarget> catalog, string executable, int fixturePid)
+    {
+        using var enumerator = new NAudio.CoreAudioApi.MMDeviceEnumerator();
+        using var device = enumerator.GetDefaultAudioEndpoint(NAudio.CoreAudioApi.DataFlow.Render, NAudio.CoreAudioApi.Role.Multimedia);
+        float master = device.AudioEndpointVolume.MasterVolumeLevelScalar;
+        var sessions = device.AudioSessionManager.Sessions;
+        var opened = new List<NAudio.CoreAudioApi.AudioSessionControl>();
+        try
+        {
+            for (int i = 0; i < sessions.Count; i++) opened.Add(sessions[i]);
+            var own = opened.Single(s => s.GetProcessID == fixturePid);
+            var others = opened.Where(s => s.GetProcessID != fixturePid).Select(s => (Session: s, Volume: s.SimpleAudioVolume.Volume, Mute: s.SimpleAudioVolume.Mute)).ToArray();
+            own.SimpleAudioVolume.Volume = 0.5f;
+            var music = new MusicPlayback(() => catalog, () => "probe", _ => { });
+            var down = await music.ExecuteAsync(new(Intent.MusicVolumeDown), default);
+            bool stepDown = down.Verified && Math.Abs(own.SimpleAudioVolume.Volume - 0.4f) < 0.005f;
+            var up = await music.ExecuteAsync(new(Intent.MusicVolumeUp), default);
+            bool stepUp = up.Verified && Math.Abs(own.SimpleAudioVolume.Volume - 0.5f) < 0.005f;
+            own.SimpleAudioVolume.Volume = 0.95f;
+            var upper = PlayerVolume.Change(executable, "Test", 0.1f, default);
+            bool ceiling = upper.Verified && own.SimpleAudioVolume.Volume == 1f;
+            own.SimpleAudioVolume.Volume = 0.05f;
+            var lower = PlayerVolume.Change(executable, "Test", -0.1f, default);
+            bool floor = lower.Verified && own.SimpleAudioVolume.Volume == 0f;
+            bool untouched = master == device.AudioEndpointVolume.MasterVolumeLevelScalar
+                && others.All(s => s.Volume == s.Session.SimpleAudioVolume.Volume && s.Mute == s.Session.SimpleAudioVolume.Mute);
+            if (!(stepDown && stepUp && ceiling && floor && untouched))
+                throw new Exception($"Volume probe: down={down.Message}; up={up.Message}; stepDown={stepDown}; stepUp={stepUp}; ceiling={ceiling}; floor={floor}; untouched={untouched}");
+            return true;
+        }
+        finally { foreach (var session in opened) session.Dispose(); }
     }
     private static async Task<int> VerifyYandex(string root)
     {

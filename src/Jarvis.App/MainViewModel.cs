@@ -17,6 +17,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private readonly SettingsStore _settingsStore;
     private readonly LaunchCatalogStore _catalogStore;
     private readonly SkillDispatcher _skills;
+    private readonly WindowControl _windows = new();
+    private IReadOnlyList<LaunchTarget> _runningTargets = [];
     private readonly LaunchConversation _conversation = new();
     private bool _voiceInteraction;
     private bool _askingChoice;
@@ -90,7 +92,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         _catalogStore = new(Path.Combine(root, "data", "apps.json"));
         var catalog = _catalogStore.Load(); _targets = targets?.ToList() ?? catalog.Targets;
         if (catalog.Warning != null) Log(catalog.Warning);
-        _skills = skills ?? BuiltInSkills.Create(root, () => Targets);
+        _skills = skills ?? BuiltInSkills.Create(root, () => Targets, _windows);
         _settingsStore = new SettingsStore(Path.Combine(root, "data", "settings.json"));
         var loaded = _settingsStore.Load();
         _settings = loaded.Settings;
@@ -336,7 +338,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     }
     private string Vocabulary()
     {
-        var enabled = Targets.Where(t => t.Enabled).ToArray();
+        var enabled = (_conversation.ChoosingWindow ? _runningTargets : Targets).Where(t => t.Enabled).ToArray();
         if (_conversation.HasPending)
             enabled = enabled.Where(t => _conversation.CandidateIds.Contains(t.Id)).ToArray();
         return LaunchVocabulary.Build(enabled, _conversation.HasPending);
@@ -358,7 +360,9 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         Phase = AssistantPhase.Executing; Status = "Выполняю команду…";
         _deadline = DateTime.UtcNow.AddSeconds(30);
         ArtifactPath = null;
-        var turn = _conversation.Resolve(text, Targets, DateTimeOffset.UtcNow);
+        if (_conversation.ChoosingWindow || System.Text.RegularExpressions.Regex.IsMatch(CommandRouter.Normalize(text), @"\b(?:закрой|выключи|сверни|переключись|покажи)\b"))
+            _runningTargets = _windows.Capture(Targets);
+        var turn = _conversation.Resolve(text, Targets, DateTimeOffset.UtcNow, _runningTargets);
         if (turn.NeedsAnswer)
         {
             _lastVerified = false; _askingChoice = true; Reply = turn.Question!; Log(Reply);

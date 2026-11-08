@@ -2,14 +2,15 @@ using System.Text.RegularExpressions;
 
 namespace Jarvis.Core;
 
-public enum Intent { OpenBrowser, Cancel, Unknown, LaunchTarget, Screenshot, OpenScreenshots, VolumeUp, VolumeDown, SetVolume, Mute, Unmute, Time, Date, Help }
-public record CommandRequest(Intent Intent, string? TargetId = null, int? Value = null, string? Explanation = null, string[]? CandidateIds = null);
+public enum Intent { OpenBrowser, Cancel, Unknown, LaunchTarget, Screenshot, OpenScreenshots, VolumeUp, VolumeDown, SetVolume, Mute, Unmute, Time, Date, Help,
+    CloseTarget, FocusTarget, MinimizeWindow, CloseWindow, OpenTargetFolder, MediaPause, MediaPlay, MediaNext, MediaPrevious }
+public record CommandRequest(Intent Intent, string? TargetId = null, int? Value = null, string? Explanation = null, string[]? CandidateIds = null, Intent? CandidateIntent = null);
 
 public static partial class CommandRouter
 {
     public static Intent Parse(string text) => Resolve(text).Intent;
     public static string Normalize(string text) => Spaces().Replace(Punctuation().Replace(text.ToLowerInvariant().Replace('ё', 'е'), " "), " ").Trim();
-    public static CommandRequest Resolve(string text, IEnumerable<LaunchTarget>? targets = null)
+    public static CommandRequest Resolve(string text, IEnumerable<LaunchTarget>? targets = null, IEnumerable<LaunchTarget>? running = null)
     {
         if (text.Length > 500 || Regex.IsMatch(text, @"[-−]\s*\d")) return new(Intent.Unknown);
         var phrase = WakePrefix().Replace(Normalize(text), "");
@@ -28,21 +29,36 @@ public static partial class CommandRouter
             "сколько времени" or "который час" or "скажи время" => Intent.Time,
             "какое сегодня число" or "скажи дату" or "сегодняшняя дата" => Intent.Date,
             "что ты умеешь" or "покажи команды" or "список команд" => Intent.Help,
+            "пауза" or "поставь на паузу" or "приостанови воспроизведение" => Intent.MediaPause,
+            "продолжи" or "продолжи воспроизведение" or "возобнови воспроизведение" or "сними с паузы" => Intent.MediaPlay,
+            "следующий трек" or "следующая песня" or "включи следующий трек" => Intent.MediaNext,
+            "предыдущий трек" or "предыдущая песня" or "включи предыдущий трек" => Intent.MediaPrevious,
+            "сверни окно" or "сверни текущее окно" or "сверни активное окно" => Intent.MinimizeWindow,
+            "закрой окно" or "закрой текущее окно" or "закрой активное окно" or "закрой текущее приложение" => Intent.CloseWindow,
             _ => Intent.Unknown
         };
         if (simple != Intent.Unknown) return new(simple);
+        var folder = Regex.Match(phrase, @"^открой (?:папку|каталог)(?: (?:с|для))?(?: (?:игрой|игры|программой|программы|приложением|приложения))? (.+)$");
+        if (folder.Success) return MatchTarget(folder.Groups[1].Value, targets, Intent.OpenTargetFolder);
+        var window = Regex.Match(phrase, @"^(закрой|выключи|переключись на|покажи)(?: (?:игру|приложение|программу))? (.+)$");
+        if (window.Success) return MatchTarget(window.Groups[2].Value, running,
+            window.Groups[1].Value is "закрой" or "выключи" ? Intent.CloseTarget : Intent.FocusTarget,
+            "Подходящего открытого окна не нашёл. Назови приложение точнее.");
         var volume = VolumePhrase().Match(phrase);
         if (volume.Success && TryNumber(volume.Groups[1].Value, out var value) && value is >= 0 and <= 100)
             return new(Intent.SetVolume, Value: value);
         var launch = LaunchPhrase().Match(phrase);
         if (!launch.Success) return new(Intent.Unknown);
-        var name = launch.Groups[1].Value;
+        return MatchTarget(launch.Groups[1].Value, targets, Intent.LaunchTarget);
+    }
+    private static CommandRequest MatchTarget(string name, IEnumerable<LaunchTarget>? targets, Intent intent, string? missing = null)
+    {
         var matches = (targets ?? []).Where(t => t.Enabled && t.Names.Any(n => Normalize(n) == name)).DistinctBy(t => t.Id).ToArray();
         return matches.Length switch
         {
-            1 => new(Intent.LaunchTarget, matches[0].Id),
-            > 1 => new(Intent.Unknown, Explanation: "Подходят несколько приложений.", CandidateIds: matches.Select(t => t.Id).ToArray()),
-            _ => new(Intent.Unknown)
+            1 => new(intent, matches[0].Id),
+            > 1 => new(Intent.Unknown, Explanation: "Подходят несколько приложений.", CandidateIds: matches.Select(t => t.Id).ToArray(), CandidateIntent: intent),
+            _ => new(Intent.Unknown, Explanation: missing, CandidateIntent: intent)
         };
     }
     private static bool TryNumber(string text, out int value)

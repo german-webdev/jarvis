@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 
 namespace Jarvis.Core;
 
-public sealed record LaunchTarget(string Id, string Name, string Kind, string Target, string Source, string[] Aliases, bool Enabled = false)
+public sealed record LaunchTarget(string Id, string Name, string Kind, string Target, string Source, string[] Aliases, bool Enabled = false, string? InstallDirectory = null)
 {
     [JsonIgnore] public string[] AutomaticAliases => NameVariants.Automatic(Name);
     [JsonIgnore] public IEnumerable<string> Names => new[] { Name }.Concat(AutomaticAliases).Concat((Aliases ?? []).SelectMany(NameVariants.Expand)).Distinct();

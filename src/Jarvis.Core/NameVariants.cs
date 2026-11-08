@@ -59,7 +59,10 @@ public static class NameVariants
             var inflected = tokens[0][..^1] + "у" + (tokens.Length == 2 ? " " + tokens[1] : "");
             yield return inflected;
             yield return SpokenNumbers(inflected);
+            yield return tokens[0][..^1] + (Regex.IsMatch(tokens[0], @"[кгхжчшщ]а$") ? "и" : "ы") + (tokens.Length == 2 ? " " + tokens[1] : "");
+            yield return tokens[0][..^1] + "ой" + (tokens.Length == 2 ? " " + tokens[1] : "");
         }
+        if (tokens.Length == 1 && Regex.IsMatch(normalized, @"^[а-я]+[бвгджзклмнпрстфхцчшщ]$")) { yield return normalized + "а"; yield return normalized + "ом"; }
         yield return SpokenNumbers(normalized);
     }
 

@@ -136,7 +136,9 @@ def main():
                 (ROOT / "work" / f"voice-denis-{style}.wav").write_bytes(voice_wav)
             results["denis_presets"] = ["natural", "robot", "radio"]
             results["name_variants"] = []
-            for phrase, expected in [("Запусти сабнавтику.", "сабнавтику"), ("Шестую.", "шестую")]:
+            for phrase, expected in [("Запусти сабнавтику.", "сабнавтику"), ("Шестую.", "шестую"),
+                                     ("Закрой телеграм.", "закрой телеграм"),
+                                     ("Открой папку с сабнавтикой.", "папку с сабнавтикой"), ("Пауза.", "пауза")]:
                 send("synthesize", session=10, text=phrase)
                 sample = pcm16k(base64.b64decode(expect("speech")["wav"]))
                 send("start", session=11, mode="command", wait_seconds=10,

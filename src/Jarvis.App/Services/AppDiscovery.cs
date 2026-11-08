@@ -90,4 +90,10 @@ public static class AppDiscovery
         var result = new DiscoveryResult([], []); ReadSteam(result);
         return result.Targets.Any(t => t.Target == id);
     }
+    public static IReadOnlyList<LaunchTarget> SteamTargets()
+    {
+        var result = new DiscoveryResult([], []);
+        try { ReadSteam(result); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        return result.Targets;
+    }
 }

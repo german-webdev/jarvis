@@ -1,4 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><OutputType>WinExe</OutputType><TargetFramework>net10.0-windows</TargetFramework><UseWPF>true</UseWPF><RestorePackagesWithLockFile>false</RestorePackagesWithLockFile></PropertyGroup>
+  <PropertyGroup><OutputType>WinExe</OutputType><TargetFramework>net10.0-windows10.0.19041.0</TargetFramework><UseWPF>true</UseWPF><RestorePackagesWithLockFile>false</RestorePackagesWithLockFile></PropertyGroup>
   <ItemGroup><ProjectReference Include="../../src/Jarvis.App/Jarvis.App.csproj"/></ItemGroup>
 </Project>

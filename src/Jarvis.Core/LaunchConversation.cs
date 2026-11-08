@@ -13,32 +13,37 @@ public sealed class LaunchConversation
     private string[] _ids = [];
     private DateTimeOffset _expires;
     private int _retries;
+    private Intent _intent = Intent.LaunchTarget;
+    public bool ChoosingWindow => HasPending && _intent is Intent.CloseTarget or Intent.FocusTarget;
     public bool HasPending => _ids.Length > 0;
     public IReadOnlyList<string> CandidateIds => _ids;
     public void Clear() { _ids = []; _retries = 0; }
     public void Renew(DateTimeOffset now) { if (HasPending) _expires = now.AddSeconds(30); }
 
-    public ConversationTurn Resolve(string text, IReadOnlyList<LaunchTarget> targets, DateTimeOffset now)
+    public ConversationTurn Resolve(string text, IReadOnlyList<LaunchTarget> targets, DateTimeOffset now, IReadOnlyList<LaunchTarget>? running = null)
     {
-        var request = CommandRouter.Resolve(text, targets);
+        var request = CommandRouter.Resolve(text, targets, running);
         var answer = CommandRouter.Normalize(text);
         answer = Regex.Replace(answer, @"^(?:джарвис|jarvis) | пожалуйста$", "");
         if (request.Intent == Intent.Cancel || answer is "нет" or "не надо" or "ничего") { Clear(); return new(new(Intent.Cancel)); }
         // Explicit new commands replace the old question. A bare answer never starts a new action.
-        if (request.Intent != Intent.Unknown || request.CandidateIds != null)
+        if (request.Intent != Intent.Unknown || request.CandidateIds != null || request.CandidateIntent != null)
         {
             Clear();
             if (request.CandidateIds == null) return new(request);
-            var candidates = request.CandidateIds.Select(id => targets.Single(t => t.Id == id)).ToArray();
+            _intent = request.CandidateIntent ?? Intent.LaunchTarget;
+            var source = _intent is Intent.CloseTarget or Intent.FocusTarget ? running ?? [] : targets;
+            var candidates = request.CandidateIds.Select(id => source.Single(t => t.Id == id)).ToArray();
             if (candidates.Length > 6) return new(new(Intent.Unknown, Explanation: $"Нашёл {candidates.Length} совпадений. Назови игру точнее, например с номером части."));
             _ids = candidates.Select(t => t.Id).ToArray(); Renew(now);
             return new(null, Question(candidates));
         }
         if (!HasPending) return new(request);
-        if (now >= _expires) { Clear(); return new(new(Intent.Unknown, Explanation: "Время выбора истекло. Повтори команду запуска.")); }
-        var options = _ids.Select(id => targets.FirstOrDefault(t => t.Enabled && t.Id == id)).ToArray();
+        if (now >= _expires) { Clear(); return new(new(Intent.Unknown, Explanation: "Время выбора истекло. Повтори команду.")); }
+        var current = ChoosingWindow ? running ?? [] : targets;
+        var options = _ids.Select(id => current.FirstOrDefault(t => t.Enabled && t.Id == id)).ToArray();
         // Do not shift positional choices if an entry disappeared or was disabled.
-        if (options.Any(t => t == null)) { Clear(); return new(new(Intent.Unknown, Explanation: "Каталог изменился. Повтори команду запуска.")); }
+        if (options.Any(t => t == null)) { Clear(); return new(new(Intent.Unknown, Explanation: "Список приложений изменился. Повтори команду.")); }
         var available = options.Select(t => t!).ToArray();
         LaunchTarget[] matches = [];
         if (!text.Contains('?') && !Regex.IsMatch(text, @"[-−]\s*\d"))
@@ -53,12 +58,12 @@ public sealed class LaunchConversation
                 matches = available.Where(t => NameVariants.VersionNumbers(t.Name).Contains(version)).ToArray();
             else matches = available.Where(t => t.Names.Any(n => CommandRouter.Normalize(n) == answer)).ToArray();
         }
-        if (matches.Length == 1) { Clear(); return new(new(Intent.LaunchTarget, matches[0].Id)); }
-        if (++_retries >= 2) { Clear(); return new(new(Intent.Unknown, Explanation: "Выбор не понял. Запуск отменён; повтори команду с полным названием.")); }
+        if (matches.Length == 1) { var action = _intent; Clear(); return new(new(action, matches[0].Id)); }
+        if (++_retries >= 2) { Clear(); return new(new(Intent.Unknown, Explanation: "Выбор не понял. Действие отменено; повтори команду с полным названием.")); }
         Renew(now);
         return new(null, "Уточни выбор. " + Question(available));
     }
-    private static string Question(IReadOnlyList<LaunchTarget> targets)
+    private string Question(IReadOnlyList<LaunchTarget> targets)
     {
         var choices = targets.Select((t, i) =>
         {
@@ -69,6 +74,7 @@ public sealed class LaunchConversation
             if (duplicate) label += " (" + source[..Math.Min(source.Length, 12)] + ")";
             return $"Вариант {i + 1}: {label}.";
         });
-        return "Что запустить? " + string.Join(" ", choices) + " Назови часть, полное название или номер варианта. Для отмены скажи: отмена.";
+        var question = _intent switch { Intent.CloseTarget => "Что закрыть? ", Intent.FocusTarget => "На какое окно переключиться? ", Intent.OpenTargetFolder => "Папку какой программы открыть? ", _ => "Что запустить? " };
+        return question + string.Join(" ", choices) + " Назови часть, полное название или номер варианта. Для отмены скажи: отмена.";
     }
 }

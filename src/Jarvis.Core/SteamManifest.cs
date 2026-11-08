@@ -15,7 +15,7 @@ public static partial class SteamManifest
             || !pairs.TryGetValue("installdir", out var directory) || !pairs.TryGetValue("StateFlags", out var state)
             || !int.TryParse(state, out var flags) || (flags & 4) == 0 || Path.IsPathRooted(directory) || directory.Contains("..")) return null;
         if (!Directory.Exists(Path.Combine(steamAppsDirectory, "common", directory))) return null;
-        var target = new LaunchTarget("steam:" + id, name, "steam", id, "Steam", [], true);
+        var target = new LaunchTarget("steam:" + id, name, "steam", id, "Steam", [], true, Path.GetFullPath(Path.Combine(steamAppsDirectory, "common", directory)));
         return target.IsValid ? target : null;
     }
     private static string Unescape(string text) => text.Replace("\\\"", "\"").Replace("\\\\", "\\");

@@ -37,14 +37,17 @@
         <TextBlock Text="{DynamicResource UiBBDA2866C6C4}" Style="{StaticResource Hint}"/>
         <TextBlock Text="{DynamicResource Ui8D0A8F2259DE}" Style="{StaticResource Hint}"/>
       </StackPanel></TabItem>
-      <TabItem><TabItem.Header><TextBlock Text="{DynamicResource Ui132B8F4355BF}" Foreground="#15283A" Margin="8,5"/></TabItem.Header><StackPanel>
+      <TabItem><TabItem.Header><TextBlock Text="{DynamicResource Ui132B8F4355BF}" Foreground="#15283A" Margin="8,5"/></TabItem.Header><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel>
         <TextBlock Text="{DynamicResource Ui327B7A8A8415}" Style="{StaticResource Label}"/><CheckBox Content="{DynamicResource Ui4E44E36ACC06}" IsChecked="{Binding WakeMode}" Foreground="#E5EEF6" Margin="0,8"/>
         <TextBlock Text="{DynamicResource UiCF4573A480B9}" Style="{StaticResource Hint}"/>
         <TextBlock Text="{DynamicResource Ui38A7BE02AFAD}" Style="{StaticResource Label}"/>
         <DockPanel><TextBlock DockPanel.Dock="Right" Text="{Binding ElementName=WaitSlider, Path=Value, StringFormat={StaticResource Ui8ED2D26D4DAD}}" Foreground="#79DCC8" Width="65" TextAlignment="Right"/><Slider x:Name="WaitSlider" Value="{Binding CommandWaitSeconds}" Minimum="4" Maximum="15" TickFrequency="1" IsSnapToTickEnabled="True"/></DockPanel>
         <TextBlock Text="{DynamicResource Ui0C144C98696D}" Style="{StaticResource Hint}"/>
+<CheckBox Content="{DynamicResource Ui45328EB9A0A8}" IsChecked="{Binding WakeSound}" Foreground="#E5EEF6" Margin="0,12,0,0"/>
+<CheckBox Content="{DynamicResource Ui02CB1D303708}" IsChecked="{Binding FollowUpListening}" Foreground="#E5EEF6" Margin="0,12,0,0"/>
+<TextBlock Text="{DynamicResource UiC5EB90ABB7B7}" Style="{StaticResource Hint}"/>
         <TextBlock Text="{DynamicResource Ui065A18F569BF}" Style="{StaticResource Label}"/><TextBlock Text="{DynamicResource Ui34DB027A092F}" Style="{StaticResource Hint}"/>
-      </StackPanel></TabItem>
+      </StackPanel></ScrollViewer></TabItem>
       <TabItem><TabItem.Header><TextBlock Text="{DynamicResource Ui26B855CC1660}" Foreground="#15283A" Margin="8,5"/></TabItem.Header><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel>
         <TextBlock Text="{DynamicResource Ui9089A73112CC}" Style="{StaticResource Label}"/>
         <ComboBox ItemsSource="{Binding Languages}" SelectedValuePath="Id" SelectedValue="{Binding InterfaceLanguage}" ItemTemplate="{StaticResource ChoiceTemplate}" Padding="9"/>
@@ -60,7 +63,7 @@
         <Button Content="{DynamicResource Ui4C41EB7DE0CE}" Click="AiClick" HorizontalAlignment="Left" Margin="0,18,0,0"/>
         <TextBlock Text="{DynamicResource UiDA4DA4E3527C}" Style="{StaticResource Label}"/><Button Content="{DynamicResource Ui64648201372F}" Click="RestartClick" HorizontalAlignment="Left" Margin="0,4,0,0"/>
         <TextBlock Text="{DynamicResource Ui9BE0D83D1E15}" Style="{StaticResource Hint}"/>
-        <TextBlock Text="{DynamicResource UiA3EF6F37E6CC}" Foreground="#69859E" FontSize="12" Margin="0,28,0,0"/>
+        <TextBlock Text="{DynamicResource Ui3881338AA5D6}" Foreground="#69859E" FontSize="12" Margin="0,28,0,0"/>
       </StackPanel></ScrollViewer></TabItem>
     </TabControl>
     <TextBlock Grid.Row="2" Text="{Binding Runtime.Status}" Foreground="#91ACBF" FontSize="12" Margin="0,14,0,14" MinHeight="32"/>

@@ -8,6 +8,8 @@ public sealed record AssistantSettings
     public string? MicrophoneId { get; init; }
     public string? MusicTargetId { get; init; }
     public bool WakeMode { get; init; }
+    public bool WakeSound { get; init; } = true;
+    public bool FollowUpListening { get; init; } = true;
     public string Voice { get; init; } = "denis";
     public string VoiceStyle { get; init; } = "robot";
     public double RobotAmount { get; init; } = 0.45;

@@ -24,6 +24,8 @@ public sealed class SettingsViewModel : ObservableObject
     public double SpeechRate { get; set; }
     public double Volume { get; set; }
     public bool WakeMode { get; set; }
+    public bool WakeSound { get; set; }
+    public bool FollowUpListening { get; set; }
     public double CommandWaitSeconds { get; set; }
     public bool ShowLog { get; set; }
     public bool ReduceMotion { get; set; }
@@ -46,6 +48,7 @@ public sealed class SettingsViewModel : ObservableObject
         MicrophoneId = runtime.SelectedMicrophone?.Id ?? s.MicrophoneId;
         Voice = s.Voice; _voiceStyle = s.VoiceStyle; RobotAmount = s.RobotAmount;
         SpeechRate = s.SpeechRate; Volume = s.Volume; WakeMode = s.WakeMode;
+        WakeSound = s.WakeSound; FollowUpListening = s.FollowUpListening;
         CommandWaitSeconds = s.CommandWaitSeconds; ShowLog = s.ShowLog; ReduceMotion = s.ReduceMotion;
         ListenOnStartup = s.ListenOnStartup; StartInTray = s.StartInTray;
     }
@@ -56,6 +59,7 @@ public sealed class SettingsViewModel : ObservableObject
         MusicTargetId = MusicTargetId,
         RobotAmount = Math.Round(RobotAmount, 2), SpeechRate = Math.Round(SpeechRate, 2),
         Volume = Math.Round(Volume, 2), WakeMode = WakeMode, CommandWaitSeconds = (int)CommandWaitSeconds,
+        WakeSound = WakeSound, FollowUpListening = FollowUpListening,
         ShowLog = ShowLog, ReduceMotion = ReduceMotion,
         ListenOnStartup = ListenOnStartup, StartInTray = StartInTray, InterfaceLanguage = InterfaceLanguage
     }.Normalize();

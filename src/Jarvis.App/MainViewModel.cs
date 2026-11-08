@@ -45,6 +45,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private long _session;
     private bool _acceptTranscript;
     private bool _resumeWake;
+    private bool _followUp;
     private DateTime _deadline = DateTime.MaxValue;
     private bool _disposed;
     private bool _restarting;
@@ -197,6 +198,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     public void Listen()
     {
         if (!CanListen) return;
+        _followUp = false;
         _conversation.Clear(); _voiceInteraction = true; _askingChoice = false;
         var session = NewSession();
         _acceptTranscript = true;
@@ -222,6 +224,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         _askingChoice = false; _voiceInteraction = false;
         _acceptTranscript = false;
         _resumeWake = false;
+        _followUp = false;
         StopMicrophone();
         _audio.StopPlayback();
         var session = NewSession();
@@ -296,7 +299,14 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             case "activated":
                 Phase = AssistantPhase.Listening;
                 Status = $"Имя услышано. Жду команду до {Settings.CommandWaitSeconds} секунд…";
-                _deadline = DateTime.UtcNow.AddSeconds(Settings.CommandWaitSeconds + 14); Log("Услышал имя"); break;
+                _deadline = DateTime.UtcNow.AddSeconds(Settings.CommandWaitSeconds + 14); Log("Услышал имя");
+                if (Settings.WakeSound)
+                {
+                    try { await _audio.PlayAsync(AudioService.ReadyCue(), token, (float)Settings.Volume); }
+                    catch (OperationCanceledException) { throw; }
+                    catch { Log("Не удалось воспроизвести сигнал готовности."); }
+                }
+                break;
             case "awaiting_command":
                 Phase = AssistantPhase.Listening;
                 Status = "Слушаю продолжение…";
@@ -313,6 +323,12 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
                 _deadline = DateTime.UtcNow.AddSeconds(45); break;
             case "empty":
                 StopMicrophone(); _acceptTranscript = false;
+                if (_followUp)
+                {
+                    _followUp = false; Busy = false; _deadline = DateTime.MaxValue;
+                    Phase = AssistantPhase.Idle; Status = "Следующей команды нет. Жду имя «Джарвис».";
+                    await ResumeWakeAsync(session, token, 100); break;
+                }
                 var wasChoosing = _conversation.HasPending;
                 _conversation.Clear();
                 Phase = AssistantPhase.Idle; Status = wasChoosing ? "Ответа не было. Выбор отменён." : "Речь не обнаружена. Попробуй ещё раз.";
@@ -347,7 +363,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
                     break;
                 }
                 CycleCompleted?.Invoke(_lastVerified);
-                await ResumeWakeAsync(session, token, 700);
+                await ResumeWakeAsync(session, token, 700, allowFollowUp: true);
                 break;
         }
     }
@@ -392,6 +408,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
     private async Task ExecuteAsync(string text, long session, CancellationToken token)
     {
+        _followUp = false;
         Phase = AssistantPhase.Executing; Status = "Выполняю команду…";
         _deadline = DateTime.UtcNow.AddSeconds(30);
         ArtifactPath = null;
@@ -429,7 +446,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         {
             Busy = false; _deadline = DateTime.MaxValue; Phase = AssistantPhase.Idle;
             Status = "Готов. Ответ показан на экране."; CycleCompleted?.Invoke(_lastVerified);
-            await ResumeWakeAsync(session, token, 200); return;
+            await ResumeWakeAsync(session, token, 200, allowFollowUp: true); return;
         }
         Phase = AssistantPhase.Synthesizing; Status = "Готовлю ответ…";
         _deadline = DateTime.UtcNow.AddSeconds(30); Speak(session, Reply, Settings);
@@ -465,6 +482,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
     private void ListenForChoice()
     {
+        _followUp = false;
         if (!_conversation.HasPending || SelectedMicrophone == null)
         { _conversation.Clear(); Busy = false; Status = "Для голосового выбора нужен микрофон. Повтори команду."; return; }
         var session = NewSession(); _acceptTranscript = true; Busy = true;
@@ -478,11 +496,20 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         catch (Exception ex) { Fail(ex.Message); }
     }
 
-    private async Task ResumeWakeAsync(long session, CancellationToken token, int delay)
+    private async Task ResumeWakeAsync(long session, CancellationToken token, int delay, bool allowFollowUp = false)
     {
         if (!_resumeWake || _disposed) return;
         await Task.Delay(delay, token);
-        if (session == _session) Listen();
+        if (session != _session) return;
+        if (allowFollowUp && _voiceInteraction && Settings.FollowUpListening && SelectedMicrophone != null)
+        {
+            var next = NewSession(); _followUp = true; _acceptTranscript = true; Busy = true;
+            Phase = AssistantPhase.Listening; Status = "Слушаю следующую команду 5 секунд — без имени «Джарвис».";
+            _deadline = DateTime.UtcNow.AddSeconds(19);
+            Send(new { type = "start", session = next, mode = "command", wait_seconds = 5, vocabulary = Vocabulary() });
+            _audio.Start(SelectedMicrophone.Id); MicrophoneActive = true;
+        }
+        else Listen();
     }
 
     public void ApplySettings(AssistantSettings settings)

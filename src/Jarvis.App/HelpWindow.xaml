@@ -1,0 +1,32 @@
+<Window x:Class="Jarvis.App.HelpWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{DynamicResource Ui0B64F8071784}" Width="1040" Height="780" MinWidth="780" MinHeight="580" WindowStartupLocation="CenterOwner"
+        Background="#0D1928" Foreground="#E9F2F7" FontFamily="Segoe UI" FontSize="14">
+  <Window.Resources>
+    <Style TargetType="ScrollBar"><Setter Property="Width" Value="8"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ScrollBar"><Track x:Name="PART_Track" Orientation="Vertical" IsDirectionReversed="True"><Track.DecreaseRepeatButton><RepeatButton Command="ScrollBar.PageUpCommand" Opacity="0"/></Track.DecreaseRepeatButton><Track.Thumb><Thumb><Thumb.Template><ControlTemplate TargetType="Thumb"><Border Background="#385469" CornerRadius="4" Margin="1"/></ControlTemplate></Thumb.Template></Thumb></Track.Thumb><Track.IncreaseRepeatButton><RepeatButton Command="ScrollBar.PageDownCommand" Opacity="0"/></Track.IncreaseRepeatButton></Track></ControlTemplate></Setter.Value></Setter></Style>
+    <Style TargetType="ListBoxItem"><Setter Property="Padding" Value="12,11"/><Setter Property="Margin" Value="0,0,0,5"/><Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListBoxItem"><Border x:Name="Surface" Background="Transparent" CornerRadius="8" Padding="{TemplateBinding Padding}"><ContentPresenter/></Border><ControlTemplate.Triggers><Trigger Property="IsSelected" Value="True"><Setter TargetName="Surface" Property="Background" Value="#244354"/><Setter Property="Foreground" Value="#79E3D0"/></Trigger><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Background" Value="#20364A"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+    </Style>
+  </Window.Resources>
+  <Grid Margin="28">
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <StackPanel Margin="0,0,0,22"><TextBlock Text="JARVIS / GUIDE" Foreground="#64DCC6" FontSize="11" FontWeight="SemiBold"/><TextBlock x:Name="Heading" FontSize="29" FontWeight="SemiBold" Margin="0,7,0,8"/><TextBlock x:Name="Intro" Foreground="#9AB2C8" TextWrapping="Wrap"/></StackPanel>
+    <Border Grid.Row="1" Background="#172A3D" CornerRadius="9" Padding="14,10" Margin="0,0,0,20"><DockPanel><TextBlock x:Name="SearchLabel" Foreground="#9AB2C8" VerticalAlignment="Center" Margin="0,0,14,0"/><TextBox x:Name="SearchBox" Background="Transparent" Foreground="#E9F2F7" BorderThickness="0" CaretBrush="#64DCC6" FontSize="15" TextChanged="SearchChanged" Padding="3"/></DockPanel></Border>
+    <Grid Grid.Row="2"><Grid.ColumnDefinitions><ColumnDefinition Width="190"/><ColumnDefinition Width="22"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+      <ListBox x:Name="Categories" Background="Transparent" Foreground="#C9D8E5" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled" SelectionChanged="CategoryChanged"><ListBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Label}" TextWrapping="Wrap" FontSize="13"/></DataTemplate></ListBox.ItemTemplate></ListBox>
+      <Grid Grid.Column="2">
+        <ScrollViewer x:Name="ResultsScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,12,0">
+          <ItemsControl x:Name="Cards"><ItemsControl.ItemTemplate><DataTemplate>
+            <Border Background="#142438" CornerRadius="12" Padding="20" Margin="0,0,0,14"><StackPanel>
+              <TextBlock Text="{Binding Title}" FontSize="20" FontWeight="SemiBold" Foreground="#F0F6FA"/>
+              <TextBlock Text="{Binding Description}" Foreground="#9AB2C8" Margin="0,7,0,15" TextWrapping="Wrap"/>
+              <ItemsControl ItemsSource="{Binding Commands}"><ItemsControl.ItemTemplate><DataTemplate><Border Background="#1C3146" CornerRadius="7" Padding="12,10" Margin="0,0,0,7"><TextBlock Text="{Binding}" Foreground="#DFEBF4" TextWrapping="Wrap" FontSize="15"/></Border></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+              <TextBlock Text="{Binding Note}" Foreground="#78CDBE" Margin="0,9,0,0" TextWrapping="Wrap" FontSize="12"/>
+            </StackPanel></Border>
+          </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+        </ScrollViewer>
+        <TextBlock x:Name="EmptyState" Visibility="Collapsed" Foreground="#9AB2C8" FontSize="17" TextWrapping="Wrap" Margin="20" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+      </Grid>
+    </Grid>
+    <DockPanel Grid.Row="3" Margin="0,18,0,0"><Button x:Name="CloseButton" DockPanel.Dock="Right" Click="CloseClick" IsCancel="True" Margin="16,0,0,0"/><TextBlock x:Name="Footer" Foreground="#7F9AB1" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap"/></DockPanel>
+  </Grid>
+</Window>

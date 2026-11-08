@@ -84,3 +84,23 @@ def test_name_filter_does_not_swallow_actual_commands():
     assert address_only("Джарвис!")
     assert not address_only("Джарвис, открой браузер")
     assert not address_only("не открывай браузер")
+
+
+def test_followup_silence_expires_without_a_command():
+    events = []
+    gate = Interaction(FakeEngine(), lambda kind, **data: events.append((kind, data)))
+    gate.start("command", wait_seconds=5)
+    for _ in range(155):
+        gate.feed(SILENCE)
+    assert events == []
+    gate.feed(SILENCE)
+    assert events == [("empty", {})]
+
+
+def test_followup_started_before_deadline_can_finish_after_it():
+    events = []
+    gate = Interaction(FakeEngine(), lambda kind, **data: events.append((kind, data)))
+    gate.start("command", wait_seconds=5)
+    for frame in [SILENCE] * 150 + [SPEECH] * 30 + [SILENCE] * 30:
+        gate.feed(frame)
+    assert [kind for kind, _ in events] == ["processing", "transcript"]

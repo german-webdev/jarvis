@@ -129,8 +129,7 @@ public partial class MainWindow : Window
         _closed = true;
     }
     private void ExitClick(object sender, RoutedEventArgs e) => RequestExit();
-    private void HelpClick(object sender, RoutedEventArgs e) => MessageBox.Show(this,
-        Ui.Text(BuiltInSkills.HelpText), Ui.Text("Команды JARVIS"));
+    private void HelpClick(object sender, RoutedEventArgs e) => new HelpWindow { Owner = this }.ShowDialog();
     private async void OnClosing(object? sender, CancelEventArgs e)
     {
         if (_closed) return;

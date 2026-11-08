@@ -9,6 +9,19 @@ public record Microphone(string Id, string Name);
 
 public sealed class AudioService : IDisposable
 {
+    public static byte[] ReadyCue()
+    {
+        const int rate = 16000, samples = 1600;
+        using var stream = new MemoryStream();
+        using (var writer = new WaveFileWriter(stream, new WaveFormat(rate, 16, 1)))
+            for (var i = 0; i < samples; i++)
+            {
+                var envelope = Math.Pow(Math.Sin(Math.PI * i / samples), 2);
+                writer.WriteSample((float)(0.22 * envelope * Math.Sin(2 * Math.PI * 880 * i / rate)));
+            }
+        return stream.ToArray();
+    }
+
     private WasapiCapture? _capture;
     private MMDevice? _device;
     private WasapiOut? _player;

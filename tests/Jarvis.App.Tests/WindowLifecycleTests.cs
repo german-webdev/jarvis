@@ -146,6 +146,37 @@ public class WindowLifecycleTests
                     Assert.True(closed);
                     Assert.False(selfRuntime.MicrophoneActive);
 
+                    // Inject a recorder: exercising confirmation must never power down the test machine.
+                    var fakePower = new RecordingPowerControl();
+                    await using (var powerRuntime = new MainViewModel(root, [], power: fakePower))
+                    {
+                        void ReadyForText() => typeof(MainViewModel).GetProperty(nameof(MainViewModel.Ready))!.SetValue(powerRuntime, true);
+                        ReadyForText();
+                        foreach (var phrase in new[] { "выключи компухтер", "перезагрузи компудахтер", "переведи компутер в режим сна", "гибернация" })
+                        {
+                            var before = fakePower.Requests.Count;
+                            await powerRuntime.RunTextAsync(phrase);
+                            Assert.True(powerRuntime.AwaitingChoice);
+                            Assert.Equal(before, fakePower.Requests.Count);
+                            powerRuntime.Stop(keepChoice: true);
+                            await powerRuntime.RunTextAsync("да подтверждаю");
+                            Assert.Equal(before + 1, fakePower.Requests.Count);
+                            Assert.False(powerRuntime.AwaitingChoice);
+                            Assert.False(powerRuntime.MicrophoneActive);
+                        }
+                        Assert.Equal(new[] { Jarvis.Core.Intent.ShutdownComputer, Jarvis.Core.Intent.RestartComputer, Jarvis.Core.Intent.SleepComputer, Jarvis.Core.Intent.HibernateComputer }, fakePower.Requests);
+                        await powerRuntime.RunTextAsync("выключи компьютер");
+                        await powerRuntime.RunTextAsync("спроси нейросеть подтверди выключение");
+                        Assert.Equal("Команда питания отменена.", powerRuntime.Reply);
+                        Assert.False(powerRuntime.AwaitingChoice);
+                        Assert.Equal(4, fakePower.Requests.Count);
+                        await powerRuntime.RunTextAsync("выключи компьютер");
+                        powerRuntime.Stop();
+                        Assert.False(powerRuntime.AwaitingChoice);
+                        await powerRuntime.RunTextAsync("да подтверждаю");
+                        Assert.Equal(4, fakePower.Requests.Count);
+                    }
+
                     window = new MainWindow(root, []) { WindowStartupLocation = WindowStartupLocation.Manual, Left = -10000, Top = -10000, ShowActivated = false, ShowInTaskbar = false };
                     closed = false;
                     window.Closed += (_, _) => closed = true;
@@ -181,5 +212,12 @@ public class WindowLifecycleTests
             yield return child;
             foreach (var nested in Descendants(child)) yield return nested;
         }
+    }
+
+    private sealed class RecordingPowerControl : Jarvis.App.Services.IPowerControl
+    {
+        public List<Jarvis.Core.Intent> Requests { get; } = [];
+        public Task RequestAsync(Jarvis.Core.Intent intent, CancellationToken token)
+        { token.ThrowIfCancellationRequested(); Requests.Add(intent); return Task.CompletedTask; }
     }
 }

@@ -26,9 +26,12 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private readonly MusicPlayback _music;
     private IReadOnlyList<LaunchTarget> _runningTargets = [];
     private readonly LaunchConversation _conversation = new();
+    private readonly PowerConfirmation _powerConfirmation = new();
+    private readonly IPowerControl _power;
+    private Intent? _powerAfterSpeech;
     private bool _voiceInteraction;
     private bool _askingChoice;
-    public bool AwaitingChoice => _conversation.HasPending;
+    public bool AwaitingChoice => _conversation.HasPending || _powerConfirmation.HasPending;
     public event Action<string>? ClarificationReady;
     private List<LaunchTarget> _targets = [];
     private string? _artifactPath;
@@ -97,9 +100,10 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     public event Action<bool>? CycleCompleted;
     public event Action? ExitRequested;
 
-    public MainViewModel(string root, IReadOnlyList<LaunchTarget>? targets = null, SkillDispatcher? skills = null)
+    public MainViewModel(string root, IReadOnlyList<LaunchTarget>? targets = null, SkillDispatcher? skills = null, IPowerControl? power = null)
     {
         _root = root;
+        _power = power ?? new PowerControl();
         Ai = new AiService(root);
         if (Ai.LoadWarning != null) Log(Ai.LoadWarning);
         Ui.Changed += RefreshLanguage;
@@ -201,7 +205,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     {
         if (!CanListen) return;
         _followUp = false;
-        _conversation.Clear(); _voiceInteraction = true; _askingChoice = false;
+        _conversation.Clear(); _powerConfirmation.Clear(); _voiceInteraction = true; _askingChoice = false;
         var session = NewSession();
         _acceptTranscript = true;
         _resumeWake = WakeMode;
@@ -223,7 +227,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     public void Stop(bool keepChoice = false)
     {
         _exitAfterSpeech = false;
-        if (!keepChoice) _conversation.Clear();
+        _powerAfterSpeech = null;
+        if (!keepChoice) { _conversation.Clear(); _powerConfirmation.Clear(); }
         _askingChoice = false; _voiceInteraction = false;
         _acceptTranscript = false;
         _resumeWake = false;
@@ -242,7 +247,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     public async Task TestVoiceAsync(AssistantSettings? preview = null)
     {
         if (!Ready || Busy) return;
-        _conversation.Clear(); _askingChoice = false; _voiceInteraction = false;
+        _conversation.Clear(); _powerConfirmation.Clear(); _askingChoice = false; _voiceInteraction = false;
         var session = NewSession();
         Busy = true;
         _lastVerified = false;
@@ -258,7 +263,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     public void ImportTestAudio(string path)
     {
         if (!Ready || Busy) return;
-        _conversation.Clear(); _askingChoice = false; _voiceInteraction = false;
+        _conversation.Clear(); _powerConfirmation.Clear(); _askingChoice = false; _voiceInteraction = false;
         using var input = new WaveFileReader(path);
         if (input.WaveFormat.SampleRate != 16000 || input.WaveFormat.Channels != 1 || input.WaveFormat.BitsPerSample != 16)
             throw new InvalidDataException("Для теста нужен WAV PCM16 mono 16 kHz.");
@@ -332,8 +337,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
                     Phase = AssistantPhase.Idle; Status = "Следующей команды нет. Жду имя «Джарвис».";
                     await ResumeWakeAsync(session, token, 100); break;
                 }
-                var wasChoosing = _conversation.HasPending;
-                _conversation.Clear();
+                var wasChoosing = AwaitingChoice;
+                _conversation.Clear(); _powerConfirmation.Clear();
                 Phase = AssistantPhase.Idle; Status = wasChoosing ? "Ответа не было. Выбор отменён." : "Речь не обнаружена. Попробуй ещё раз.";
                 Busy = false; _deadline = DateTime.MaxValue; CycleCompleted?.Invoke(false);
                 if (wasChoosing) await ResumeWakeAsync(session, token, 200);
@@ -351,11 +356,17 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
                 await _audio.PlayAsync(Convert.FromBase64String(message.GetProperty("wav").GetString()!), token, _replyVolume);
                 if (session != _session) return;
                 if (_exitAfterSpeech) { _exitAfterSpeech = false; ExitRequested?.Invoke(); break; }
+                if (_powerAfterSpeech is { } powerIntent)
+                {
+                    _powerAfterSpeech = null;
+                    await ExecutePowerAsync(powerIntent);
+                    break;
+                }
                 Busy = false; _deadline = DateTime.MaxValue;
                 Phase = AssistantPhase.Idle; Level = 0; Status = "Готов к следующей команде.";
-                if (_askingChoice && _conversation.HasPending)
+                if (_askingChoice && AwaitingChoice)
                 {
-                    _askingChoice = false; _conversation.Renew(DateTimeOffset.UtcNow);
+                    _askingChoice = false; _conversation.Renew(DateTimeOffset.UtcNow); _powerConfirmation.Renew(DateTimeOffset.UtcNow);
                     if (_voiceInteraction)
                     {
                         // No microphone while TTS plays; a short tail delay prevents hearing our own question.
@@ -393,6 +404,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     }
     private string Vocabulary()
     {
+        if (_powerConfirmation.HasPending) return "да подтверждаю, подтверждаю, отмена, нет, стоп";
         var enabled = (_conversation.ChoosingWindow ? _runningTargets : CommandTargets).Where(t => t.Enabled).ToArray();
         if (_conversation.HasPending)
             enabled = enabled.Where(t => _conversation.CandidateIds.Contains(t.Id)).ToArray();
@@ -416,6 +428,35 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         Phase = AssistantPhase.Executing; Status = "Выполняю команду…";
         _deadline = DateTime.UtcNow.AddSeconds(30);
         ArtifactPath = null;
+        // Consume confirmation before AI routing; any other answer cancels this one-use request.
+        if (_powerConfirmation.HasPending)
+        {
+            var confirmed = _powerConfirmation.Consume(text, DateTimeOffset.UtcNow);
+            _askingChoice = false;
+            if (confirmed is { } intent)
+            {
+                Reply = "Выполняю " + PowerConfirmation.ActionName(intent) + "."; Log(Reply);
+                if (!_voiceInteraction) { await ExecutePowerAsync(intent); return; }
+                _powerAfterSpeech = intent;
+            }
+            else { Reply = "Команда питания отменена."; Log(Reply); }
+            if (!_voiceInteraction) { Busy = false; Phase = AssistantPhase.Idle; _deadline = DateTime.MaxValue; return; }
+            Phase = AssistantPhase.Synthesizing; Speak(session, Reply, Settings); return;
+        }
+        var powerRequest = CommandRouter.Resolve(text);
+        if (PowerConfirmation.IsPower(powerRequest.Intent))
+        {
+            _conversation.Clear(); _lastVerified = false;
+            Reply = _powerConfirmation.Begin(powerRequest.Intent, DateTimeOffset.UtcNow); Log(Reply);
+            if (!_voiceInteraction)
+            {
+                Busy = false; Phase = AssistantPhase.Idle; _deadline = DateTime.MaxValue;
+                Status = "Жду подтверждение через меню «Команда текстом».";
+                ClarificationReady?.Invoke(Reply); return;
+            }
+            _askingChoice = true; Phase = AssistantPhase.Synthesizing;
+            Speak(session, Reply, Settings); return;
+        }
         var explicitQuestion = AiRouting.ExplicitQuestion(text);
         if (explicitQuestion != null)
         {
@@ -497,14 +538,16 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private void ListenForChoice()
     {
         _followUp = false;
-        if (!_conversation.HasPending || SelectedMicrophone == null)
-        { _conversation.Clear(); Busy = false; Status = "Для голосового выбора нужен микрофон. Повтори команду."; return; }
+        if (!AwaitingChoice || SelectedMicrophone == null)
+        { _conversation.Clear(); _powerConfirmation.Clear(); Busy = false; Status = "Для голосового выбора нужен микрофон. Повтори команду."; return; }
         var session = NewSession(); _acceptTranscript = true; Busy = true;
-        Phase = AssistantPhase.Listening; Status = "Назови часть или вариант. Повторять «Джарвис» не нужно. Жду 10 секунд.";
+        Phase = AssistantPhase.Listening; Status = _powerConfirmation.HasPending
+            ? "Скажи «Да, подтверждаю» или «Отмена». Жду 10 секунд."
+            : "Назови часть или вариант. Повторять «Джарвис» не нужно. Жду 10 секунд.";
         _deadline = DateTime.UtcNow.AddSeconds(24);
         try
         {
-            Send(new { type = "start", session, mode = "command", wait_seconds = 10, vocabulary = Vocabulary(), choosing = true });
+            Send(new { type = "start", session, mode = "command", wait_seconds = 10, vocabulary = Vocabulary(), choosing = !_powerConfirmation.HasPending });
             _audio.Start(SelectedMicrophone.Id); MicrophoneActive = true; Log("Слушаю уточнение");
         }
         catch (Exception ex) { Fail(ex.Message); }
@@ -526,10 +569,32 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         else Listen();
     }
 
+    private async Task ExecutePowerAsync(Intent intent)
+    {
+        // Stop mic, wake loop and watchdog before suspension; no stale operation resumes after wake.
+        Stop();
+        var session = _session;
+        var token = _operation.Token;
+        Busy = true; Phase = AssistantPhase.Executing;
+        Status = "Передаю команду питания Windows…";
+        try
+        {
+            await _power.RequestAsync(intent, token);
+            if (session != _session) return;
+            Reply = "Запрос питания передан Windows.";
+        }
+        catch (OperationCanceledException) { return; }
+        catch (Exception ex) { if (session != _session) return; Reply = ex.Message; }
+        if (session != _session) return;
+        Log(Reply); Busy = false; Phase = AssistantPhase.Idle;
+        Status = "Прослушивание остановлено. Для продолжения нажми «Начать».";
+    }
+
     public void ApplySettings(AssistantSettings settings)
     {
         settings = settings.Normalize();
         _settingsStore.Save(settings);
+        _powerConfirmation.Clear();
         _settings = settings;
         Ui.Apply(settings.InterfaceLanguage);
         if (!Busy) RefreshDevices();

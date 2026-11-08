@@ -13,7 +13,7 @@ public static class LaunchVocabulary
         IEnumerable<string> RoundRobin(int start, int count) => Enumerable.Range(start, count)
             .SelectMany(i => priority.Where(g => g.Length > i).Select(g => g[i]));
         string[] answers = choosing ? ["первую", "вторую", "третью", "четвертую", "пятую", "шестую", "вариант один", "вариант два", "отмена"] : [];
-        var hints = answers.Concat(enabled.SelectMany(t => NameVariants.SplitCustom(t.Aliases)))
+        var hints = answers.Concat(new[] { "компьютер", "компухтер", "компудахтер", "компутер", "перезагрузи", "гибернация", "режим сна" }).Concat(enabled.SelectMany(t => NameVariants.SplitCustom(t.Aliases)))
             .Concat(RoundRobin(0, 4)).Concat(enabled.Select(t => t.Name)).Concat(RoundRobin(4, 8));
         var selected = new List<string>();
         int length = 0;

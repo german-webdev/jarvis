@@ -4,7 +4,7 @@ namespace Jarvis.Core;
 
 public enum Intent { OpenBrowser, Cancel, Unknown, LaunchTarget, Screenshot, OpenScreenshots, VolumeUp, VolumeDown, SetVolume, Mute, Unmute, Time, Date, Help,
     CloseTarget, FocusTarget, MinimizeWindow, CloseWindow, OpenTargetFolder, MediaPause, MediaPlay, MediaNext, MediaPrevious, StartMusic, MusicVolumeUp, MusicVolumeDown,
-    ExitAssistant, AssistantPresent, HowAreYou }
+    ExitAssistant, AssistantPresent, HowAreYou, ShutdownComputer, RestartComputer, SleepComputer, HibernateComputer }
 public record CommandRequest(Intent Intent, string? TargetId = null, int? Value = null, string? Explanation = null, string[]? CandidateIds = null, Intent? CandidateIntent = null);
 
 public static partial class CommandRouter
@@ -20,6 +20,17 @@ public static partial class CommandRouter
         phrase = Regex.Replace(phrase, @"^делай (?=(?:по)?(?:тише|тиши|громче|громчи)$)", "сделай ");
         if (text.Contains('?') && phrase is not ("сколько времени" or "который час" or "какое сегодня число" or "что ты умеешь" or "как дела" or "как у тебя дела")) return new(Intent.Unknown);
         if (phrase is "отмена" or "отмени") return new(Intent.Cancel);
+        // These aliases apply only to exact power phrases, never to catalog names.
+        var powerPhrase = Regex.Replace(phrase, @"\b(?:компухтер|компудахтер|компутер)\b", "компьютер");
+        var power = powerPhrase switch
+        {
+            "выключи компьютер" or "отключи компьютер" => Intent.ShutdownComputer,
+            "перезагрузи компьютер" => Intent.RestartComputer,
+            "режим сна" or "включи режим сна" or "переведи компьютер в режим сна" or "отправь компьютер в сон" => Intent.SleepComputer,
+            "гибернация" or "включи гибернацию" or "переведи компьютер в гибернацию" or "переведи компьютер в режим гибернации" or "отправь компьютер в гибернацию" => Intent.HibernateComputer,
+            _ => Intent.Unknown
+        };
+        if (power != Intent.Unknown) return new(power);
         if (phrase is "закрой себя" or "выключи себя" or "заверши свою работу"
             || Regex.IsMatch(phrase, @"^(?:закрой|выключи) (?:джарвис|джарвиса|джервис|джарвиз|чарвис|jarvis)$")) return new(Intent.ExitAssistant);
         if (Regex.IsMatch(phrase, @"^(?:открой|запусти) (?:джарвис|джарвиса|джервис|джарвиз|чарвис|jarvis)$")) return new(Intent.AssistantPresent);

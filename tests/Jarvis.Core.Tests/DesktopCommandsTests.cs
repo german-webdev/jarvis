@@ -63,7 +63,6 @@ public class DesktopCommandsTests
     [InlineData("закрой телеграм и браузер")]
     [InlineData("закрой телеграм?")]
     [InlineData("открой папку C:\\Windows")]
-    [InlineData("выключи компьютер")]
     [InlineData("принудительно закрой телеграм")]
     public void NoBroadOrComposedActions(string phrase) => Assert.Equal(Intent.Unknown, CommandRouter.Resolve(phrase, _apps, _apps).Intent);
     [Fact] public void UnknownNewCommandDiscardsOldCloseQuestion()

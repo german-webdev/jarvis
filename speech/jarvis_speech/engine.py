@@ -1,10 +1,13 @@
 import io
 import json
+import time
 import wave
 from pathlib import Path
 
 import numpy as np
 import onnxruntime as ort
+
+from jarvis_speech.voice_effects import apply_effect
 
 
 class Vad:
@@ -51,18 +54,28 @@ class Engine:
         )
         progress("Загружаю голос Дмитрий…")
         self.voice = PiperVoice.load(str(models / "piper" / "ru_RU-dmitri-medium.onnx"))
+        self.models = models
+        self.voices = {"dmitri": self.voice}
         self.speech_cache = {}
         progress("Загружаю ожидание имени…")
         SetLogLevel(-1)
         self.wake_model = Model(str(models / "vosk-model-small-ru-0.22"))
         self.wake = KaldiRecognizer(self.wake_model, 16000)
+        self.wake.SetWords(True)
 
-    def wake_detected(self, pcm: bytes) -> bool:
+    def wake_boundary(self, pcm: bytes) -> int | None:
         final = self.wake.AcceptWaveform(pcm)
         value = json.loads(self.wake.Result() if final else self.wake.PartialResult())
         words = value.get("text", value.get("partial", "")).lower().split()
         # No broad fuzzy matching: similar TV words must not activate commands.
-        return "джарвис" in words or "jarvis" in words
+        if not ({"джарвис", "jarvis"} & set(words)):
+            return None
+        # Finalize only after the fast partial match; stable partial timestamps are much slower.
+        result = value if final else json.loads(self.wake.FinalResult())
+        for word in result.get("result", []):
+            if word["word"] in {"джарвис", "jarvis"}:
+                return round(word["end"] * 16000)
+        return None
 
     def reset(self):
         self.vad.reset()
@@ -82,14 +95,28 @@ class Engine:
         )
         return " ".join(s.text.strip() for s in segments).strip()
 
-    def synthesize(self, text: str) -> bytes:
+    def recognize(self, pcm: bytes) -> tuple[str, int]:
+        started = time.perf_counter()
+        text = self.transcribe(pcm)
+        return text, round((time.perf_counter() - started) * 1000)
+
+    def synthesize(self, text: str, voice="dmitri", style="natural", amount=0.45, rate=1.0) -> bytes:
+        from piper import PiperVoice, SynthesisConfig
+
         if len(text) > 500:
             raise ValueError("Reply is too long")
-        if text not in self.speech_cache:
+        if voice not in {"dmitri", "denis"} or not 0.85 <= rate <= 1.2:
+            raise ValueError("Unsupported voice or speech rate")
+        if voice not in self.voices:
+            self.voices[voice] = PiperVoice.load(str(self.models / "piper" / f"ru_RU-{voice}-medium.onnx"))
+        key = (text, voice, style, round(amount, 2), round(rate, 2))
+        if key not in self.speech_cache:
             stream = io.BytesIO()
             with wave.open(stream, "wb") as out:
-                self.voice.synthesize_wav(text, out)
+                self.voices[voice].synthesize_wav(
+                    text, out, syn_config=SynthesisConfig(length_scale=1 / rate)
+                )
             if len(self.speech_cache) >= 32:
                 self.speech_cache.clear()
-            self.speech_cache[text] = stream.getvalue()
-        return self.speech_cache[text]
+            self.speech_cache[key] = apply_effect(stream.getvalue(), style, amount)
+        return self.speech_cache[key]

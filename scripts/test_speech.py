@@ -99,6 +99,39 @@ def main():
             send("synthesize", session=5, text="Браузер открыт.")
             assert len(base64.b64decode(expect("speech")["wav"])) > 1000
             results["reply_synthesized"] = True
+            send("synthesize", session=6, text="Джарвис.")
+            name_audio = pcm16k(base64.b64decode(expect("speech")["wav"]))
+            send("synthesize", session=6, text="Запусти браузер, пожалуйста.")
+            command_audio = pcm16k(base64.b64decode(expect("speech")["wav"]))
+
+            def stream(data, session):
+                for offset in range(0, len(data), 3200):
+                    send("audio", session=session, pcm=base64.b64encode(data[offset:offset + 3200]).decode())
+
+            send("start", session=7, mode="wake", wait_seconds=8)
+            expect("listening")
+            stream(name_audio + bytes(64000), 7)  # name, then a two-second pause
+            expect("activated")
+            # A transcript of the name must never reach the desktop command router.
+            time.sleep(0.15)
+            while not messages.empty():
+                event = messages.get_nowait()
+                assert event["type"] not in {"transcript", "empty", "command_timeout", "error"}, event
+            stream(command_audio + bytes(32000), 7)
+            results["paused_wake_transcript"] = expect("transcript")
+            assert "браузер" in results["paused_wake_transcript"]["text"].lower()
+            send("start", session=8, mode="wake", wait_seconds=4)
+            expect("listening")
+            stream(name_audio + bytes(160000), 8)
+            expect("activated")
+            expect("command_timeout")
+            results["name_only_timeout"] = True
+            for style in ["natural", "robot", "radio"]:
+                send("synthesize", session=9, text="Системы готовы. Слушаю ваши команды.", voice="denis", style=style)
+                voice_wav = base64.b64decode(expect("speech")["wav"])
+                assert len(voice_wav) > 1000
+                (ROOT / "work" / f"voice-denis-{style}.wav").write_bytes(voice_wav)
+            results["denis_presets"] = ["natural", "robot", "radio"]
             (ROOT / "work" / "speech-smoke.json").write_text(
                 json.dumps(results, indent=2, ensure_ascii=False), encoding="utf-8"
             )

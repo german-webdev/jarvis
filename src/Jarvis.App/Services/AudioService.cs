@@ -1,6 +1,7 @@
 using System.IO;
 using NAudio.CoreAudioApi;
 using NAudio.Wave;
+using NAudio.Wave.SampleProviders;
 
 namespace Jarvis.App.Services;
 
@@ -13,6 +14,7 @@ public sealed class AudioService : IDisposable
     private WasapiOut? _player;
     public event Action<byte[]>? Audio;
     public event Action<float>? Level;
+    public event Action<float>? PlaybackLevel;
     public event Action<string>? Failed;
 
     public static string? DefaultDeviceId()
@@ -67,7 +69,7 @@ public sealed class AudioService : IDisposable
         Level?.Invoke(0);
     }
 
-    public async Task PlayAsync(byte[] wav, CancellationToken token)
+    public async Task PlayAsync(byte[] wav, CancellationToken token, float volume = 0.8f)
     {
         using var stream = new MemoryStream(wav, writable: false);
         using var reader = new WaveFileReader(stream);
@@ -76,11 +78,14 @@ public sealed class AudioService : IDisposable
         var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         output.PlaybackStopped += (_, args) =>
         { if (args.Exception != null) done.TrySetException(args.Exception); else done.TrySetResult(); };
-        output.Init(reader);
+        var gain = new VolumeSampleProvider(reader.ToSampleProvider()) { Volume = Math.Clamp(volume, 0, 1) };
+        var meter = new MeteringSampleProvider(gain) { SamplesPerNotification = reader.WaveFormat.SampleRate / 25 };
+        meter.StreamVolume += (_, args) => PlaybackLevel?.Invoke(args.MaxSampleValues.Max());
+        output.Init(meter.ToWaveProvider());
         output.Play();
         using var registration = token.Register(() => output.Stop());
         try { await done.Task.WaitAsync(TimeSpan.FromSeconds(30), token); }
-        finally { output.Stop(); if (_player == output) _player = null; }
+        finally { output.Stop(); PlaybackLevel?.Invoke(0); if (_player == output) _player = null; }
     }
 
     public void StopPlayback() => _player?.Stop();

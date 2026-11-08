@@ -7,11 +7,11 @@ import sys
 import threading
 import time
 import traceback
-from collections import deque
 from pathlib import Path
 
 from jarvis_speech.engine import Engine
-from jarvis_speech.segmenter import FRAME_BYTES, Segmenter
+from jarvis_speech.interaction import Interaction
+from jarvis_speech.segmenter import FRAME_BYTES
 
 
 def emit(kind, session=0, **values):
@@ -47,10 +47,7 @@ def main():
     threading.Thread(target=read_commands, args=(inbox,), daemon=True).start()
     emit("ready", protocol=1, asr="small/cpu/int8", voice="ru_RU-dmitri-medium")
     session = 0
-    mode = "idle"
-    pending = bytearray()
-    preroll = deque(maxlen=62)  # almost two seconds, includes a name spoken without a pause
-    segmenter = Segmenter()
+    interaction = Interaction(engine, lambda kind, **values: emit(kind, session, **values))
 
     def transcribe(pcm):
         emit("processing", session)
@@ -68,27 +65,25 @@ def main():
             if kind == "start":
                 session = int(incoming)
                 mode = command.get("mode", "command")
-                if mode not in {"command", "wake"}:
-                    raise ValueError("Unknown listening mode")
-                pending.clear()
-                preroll.clear()
-                segmenter.reset()
-                engine.reset()
+                interaction.start(mode, float(command.get("wait_seconds", 8)))
                 emit("listening", session, mode=mode)
             elif kind == "cancel":
-                mode = "idle"
-                pending.clear()
-                preroll.clear()
-                segmenter.reset()
+                interaction.reset()
                 engine.reset()
                 session = int(incoming)
             elif kind == "synthesize":
                 # No action is ever executed here. The host decides whether this reply is still relevant.
-                wav = engine.synthesize(str(command["text"]))
+                wav = engine.synthesize(
+                    str(command["text"]),
+                    voice=command.get("voice", "dmitri"),
+                    style=command.get("style", "natural"),
+                    amount=float(command.get("amount", 0.45)),
+                    rate=float(command.get("rate", 1.0)),
+                )
                 emit("speech", incoming, wav=base64.b64encode(wav).decode("ascii"))
             elif kind == "transcribe":
                 session = int(incoming)
-                mode = "idle"
+                interaction.reset()
                 pcm = base64.b64decode(command["pcm"], validate=True)
                 if not 3200 <= len(pcm) <= 640000 or len(pcm) % 2:
                     raise ValueError("Expected 0.1–20 seconds of PCM16 mono at 16 kHz")
@@ -101,37 +96,12 @@ def main():
                     emit("empty", session)
                 else:
                     transcribe(pcm)
-            elif kind == "audio" and incoming == session and mode != "idle":
-                pcm = base64.b64decode(command["pcm"], validate=True)
-                if len(pcm) > 32000 or len(pcm) % 2:
-                    raise ValueError("Audio packet exceeds one second or is not PCM16")
-                pending.extend(pcm)
-                while len(pending) >= FRAME_BYTES and mode != "idle":
-                    frame = bytes(pending[:FRAME_BYTES])
-                    del pending[:FRAME_BYTES]
-                    if mode == "wake":
-                        preroll.append(frame)
-                        if engine.wake_detected(frame):
-                            mode = "command"
-                            emit("activated", session)
-                            segmenter.reset()
-                            engine.vad.reset()
-                            for old in preroll:
-                                segmenter.feed(old, engine.vad.probability(old))
-                            preroll.clear()
-                        continue
-                    result = segmenter.feed(frame, engine.vad.probability(frame))
-                    if result:
-                        mode = "idle"
-                        outcome, audio = result
-                        if outcome == "audio":
-                            transcribe(audio)
-                        else:
-                            emit("empty", session)
+            elif kind == "audio" and incoming == session:
+                interaction.feed(base64.b64decode(command["pcm"], validate=True))
             elif kind not in {"audio"}:
                 raise ValueError("Unknown protocol operation")
         except Exception as error:
-            mode = "idle"
+            interaction.reset()
             traceback.print_exc(file=sys.stderr)
             emit("error", incoming, text=str(error))
 

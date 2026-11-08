@@ -14,6 +14,11 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 {
     private readonly string _root;
     private readonly AudioService _audio = new();
+    private readonly SettingsStore _settingsStore;
+    private AssistantSettings _settings = new();
+    private AssistantPhase _phase = AssistantPhase.Loading;
+    private bool _microphoneActive;
+    private float _replyVolume = 0.8f;
     private WorkerClient? _worker;
     private CancellationTokenSource _operation = new();
     private readonly DispatcherTimer _watchdog;
@@ -28,7 +33,6 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private string _reply = "Открой браузер · Запусти браузер";
     private bool _ready;
     private bool _busy;
-    private bool _wakeMode;
     private double _level;
     private Microphone? _selected;
 
@@ -37,7 +41,27 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     public string Reply { get => _reply; private set => SetProperty(ref _reply, value); }
     public bool Ready { get => _ready; private set { SetProperty(ref _ready, value); Changed(); } }
     public bool Busy { get => _busy; private set { SetProperty(ref _busy, value); Changed(); } }
-    public bool WakeMode { get => _wakeMode; set => SetProperty(ref _wakeMode, value); }
+    public bool WakeMode => Settings.WakeMode;
+    public AssistantSettings Settings => _settings;
+    public bool ReduceMotion => Settings.ReduceMotion;
+    public string ModeLabel => WakeMode ? "По имени · Джарвис" : "По кнопке";
+    public string VoiceLabel => Settings.VoiceStyle switch { "robot" => "Синтез", "radio" => "Радиоканал", _ => "Естественный голос" };
+    public bool ShowLog { get => Settings.ShowLog; set { if (value != Settings.ShowLog) { try { ApplySettings(Settings with { ShowLog = value }); } catch (Exception ex) { Log("Настройки: " + ex.Message); } } } }
+    public bool MicrophoneActive { get => _microphoneActive; private set { SetProperty(ref _microphoneActive, value); OnPropertyChanged(nameof(MicrophoneLabel)); } }
+    public string MicrophoneLabel => MicrophoneActive ? "Микрофон включён" : "Микрофон выключен";
+    public AssistantPhase Phase { get => _phase; private set { SetProperty(ref _phase, value); OnPropertyChanged(nameof(PhaseTitle)); } }
+    public string PhaseTitle => Phase switch
+    {
+        AssistantPhase.Loading => "Знакомлюсь с системой",
+        AssistantPhase.WaitingForName => "Я на связи",
+        AssistantPhase.Listening => "Слушаю тебя",
+        AssistantPhase.Recognizing => "Разбираю команду",
+        AssistantPhase.Executing => "Выполняю",
+        AssistantPhase.Synthesizing => "Готовлю ответ",
+        AssistantPhase.Speaking => "Отвечаю",
+        AssistantPhase.Fault => "Нужно внимание",
+        _ => "Готов к работе"
+    };
     public double Level { get => _level; private set => SetProperty(ref _level, value); }
     public Microphone? SelectedMicrophone { get => _selected; set { SetProperty(ref _selected, value); Changed(); } }
     public bool CanListen => Ready && !Busy && SelectedMicrophone != null;
@@ -51,12 +75,17 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     public MainViewModel(string root)
     {
         _root = root;
+        _settingsStore = new SettingsStore(Path.Combine(root, "data", "settings.json"));
+        var loaded = _settingsStore.Load();
+        _settings = loaded.Settings;
+        if (loaded.Warning != null) Log(loaded.Warning);
         _audio.Audio += data =>
         {
             if (_worker?.Send(new { type = "audio", session = _session, pcm = Convert.ToBase64String(data) }) != true)
                 Dispatch(() => Fail("Очередь звука переполнена. Перезапусти модуль."));
         };
-        _audio.Level += value => Dispatch(() => Level = Math.Min(100, value * 200));
+        _audio.Level += value => Dispatch(() => { if (Phase != AssistantPhase.Speaking) Level = Math.Min(100, value * 200); });
+        _audio.PlaybackLevel += value => Dispatch(() => { if (Phase == AssistantPhase.Speaking) Level = Math.Min(100, value * 160); });
         _audio.Failed += error => Dispatch(() => Fail("Микрофон: " + error));
         _watchdog = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _watchdog.Tick += (_, _) =>
@@ -78,7 +107,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         if (Busy) return;
         try
         {
-            var previous = SelectedMicrophone?.Id ?? AudioService.DefaultDeviceId();
+            var previous = Settings.MicrophoneId ?? SelectedMicrophone?.Id ?? AudioService.DefaultDeviceId();
             Microphones.Clear();
             foreach (var mic in AudioService.Devices()) Microphones.Add(mic);
             SelectedMicrophone = Microphones.FirstOrDefault(m => m.Id == previous) ?? Microphones.FirstOrDefault();
@@ -99,7 +128,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         _worker = null;
         if (previous != null) await previous.DisposeAsync();
         if (_disposed) return;
-        Status = "Загружаю модели — при первом запуске это займёт немного времени…";
+        Phase = AssistantPhase.Loading;
+        Status = "Загружаю голос и распознавание…";
         _deadline = DateTime.UtcNow.AddMinutes(2);
         var worker = new WorkerClient();
         _worker = worker;
@@ -131,12 +161,14 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         _resumeWake = WakeMode;
         Busy = true;
         Transcript = "…";
-        Status = WakeMode ? "Жду «Джарвис» — затем скажи команду" : "Слушаю. Скажи: «Открой браузер»";
-        _deadline = WakeMode ? DateTime.MaxValue : DateTime.UtcNow.AddSeconds(18);
+        Phase = WakeMode ? AssistantPhase.WaitingForName : AssistantPhase.Listening;
+        Status = WakeMode ? "Скажи «Джарвис», затем команду. Между ними можно сделать паузу." : "Скажи команду. Например: открой браузер.";
+        _deadline = WakeMode ? DateTime.MaxValue : DateTime.UtcNow.AddSeconds(Settings.CommandWaitSeconds + 14);
         try
         {
-            Send(new { type = "start", session, mode = WakeMode ? "wake" : "command" });
+            Send(new { type = "start", session, mode = WakeMode ? "wake" : "command", wait_seconds = Settings.CommandWaitSeconds });
             _audio.Start(SelectedMicrophone!.Id);
+            MicrophoneActive = true;
             Log(WakeMode ? "Ожидание имени включено" : "Микрофон включён");
         }
         catch (Exception ex) { Fail(ex.Message); }
@@ -146,26 +178,29 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     {
         _acceptTranscript = false;
         _resumeWake = false;
-        _audio.StopCapture();
+        StopMicrophone();
         _audio.StopPlayback();
         var session = NewSession();
         _worker?.Send(new { type = "cancel", session });
         _deadline = DateTime.MaxValue;
         Busy = false;
-        Status = "Микрофон выключен";
+        Phase = AssistantPhase.Idle;
+        Level = 0;
+        Status = "Нажми «Начать», чтобы включить прослушивание.";
     }
 
-    public async Task TestVoiceAsync()
+    public async Task TestVoiceAsync(AssistantSettings? preview = null)
     {
         if (!Ready || Busy) return;
         var session = NewSession();
         Busy = true;
         _lastVerified = false;
         _resumeWake = false;
-        Reply = "Я Джарвис. Готов открыть браузер по твоей команде.";
+        Reply = "Системы готовы. Я Джарвис. Слушаю ваши команды.";
+        Phase = AssistantPhase.Synthesizing;
         Status = "Готовлю голос…";
         _deadline = DateTime.UtcNow.AddSeconds(30);
-        Send(new { type = "synthesize", session, text = Reply });
+        Speak(session, Reply, preview ?? Settings);
         await Task.CompletedTask;
     }
 
@@ -199,7 +234,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         if (type == "ready")
         {
             Ready = true; _deadline = DateTime.MaxValue;
-            Status = "Готов. Выбери микрофон и нажми «Слушать»";
+            Phase = AssistantPhase.Idle;
+            Status = "Нажми «Начать». Голос и микрофон можно изменить в настройках.";
             Log("Модели готовы · локально · CPU"); Initialized?.Invoke(); return;
         }
         var session = message.GetProperty("session").GetInt64();
@@ -208,56 +244,94 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         switch (type)
         {
             case "activated":
-                Status = "Имя услышано. Слушаю команду…";
-                _deadline = DateTime.UtcNow.AddSeconds(18); Log("Услышал имя"); break;
+                Phase = AssistantPhase.Listening;
+                Status = $"Имя услышано. Жду команду до {Settings.CommandWaitSeconds} секунд…";
+                _deadline = DateTime.UtcNow.AddSeconds(Settings.CommandWaitSeconds + 14); Log("Услышал имя"); break;
+            case "awaiting_command":
+                Phase = AssistantPhase.Listening;
+                Status = "Слушаю продолжение…";
+                _deadline = DateTime.UtcNow.AddSeconds(Settings.CommandWaitSeconds + 14); break;
+            case "command_timeout":
+                StopMicrophone(); _acceptTranscript = false;
+                Phase = AssistantPhase.Idle; Busy = false; _deadline = DateTime.MaxValue;
+                Status = "Команды не было. Возвращаюсь к ожиданию имени.";
+                Log("После имени команда не прозвучала");
+                await ResumeWakeAsync(session, token, 200); break;
             case "processing":
-                _audio.StopCapture(); Status = "Распознаю фразу…";
+                if (!message.TryGetProperty("keep_capture", out var keep) || !keep.GetBoolean()) StopMicrophone();
+                Phase = AssistantPhase.Recognizing; Status = "Распознаю фразу…";
                 _deadline = DateTime.UtcNow.AddSeconds(45); break;
             case "empty":
-                _audio.StopCapture(); _acceptTranscript = false;
-                Status = "Речь не обнаружена. Попробуй ещё раз.";
+                StopMicrophone(); _acceptTranscript = false;
+                Phase = AssistantPhase.Idle; Status = "Речь не обнаружена. Попробуй ещё раз.";
                 Busy = false; _deadline = DateTime.MaxValue; CycleCompleted?.Invoke(false); break;
             case "transcript":
                 if (!_acceptTranscript) return;
                 _acceptTranscript = false;
-                _audio.StopCapture(); Transcript = Text();
+                StopMicrophone(); Transcript = Text();
                 var elapsed = message.GetProperty("elapsed_ms").GetInt32();
                 Log($"Распознавание: {elapsed} мс · {Transcript}");
                 var intent = CommandRouter.Parse(Transcript);
                 _lastVerified = false;
                 if (intent == Intent.OpenBrowser)
                 {
-                    Status = "Открываю браузер…";
+                    Phase = AssistantPhase.Executing; Status = "Открываю браузер…";
                     var result = await BrowserLauncher.OpenAsync(token);
                     if (session != _session) return;
                     _lastVerified = result.Verified; Reply = result.Message;
                 }
-                else Reply = intent == Intent.Cancel ? "Отменено." : "Пока я умею открывать браузер. Скажи: открой браузер.";
-                Log(Reply); Status = "Готовлю ответ…";
+                else Reply = intent == Intent.Cancel ? "Отменено." : "Команду не понял. Попробуй сказать: открой браузер.";
+                Log(Reply); Phase = AssistantPhase.Synthesizing; Status = "Готовлю ответ…";
                 _deadline = DateTime.UtcNow.AddSeconds(30);
-                Send(new { type = "synthesize", session, text = Reply }); break;
+                Speak(session, Reply, Settings); break;
             case "speech":
-                Status = "Отвечаю… Микрофон выключен";
-                await _audio.PlayAsync(Convert.FromBase64String(message.GetProperty("wav").GetString()!), token);
+                Phase = AssistantPhase.Speaking; Status = "Можно остановить ответ кнопкой «Стоп».";
+                await _audio.PlayAsync(Convert.FromBase64String(message.GetProperty("wav").GetString()!), token, _replyVolume);
                 if (session != _session) return;
                 Busy = false; _deadline = DateTime.MaxValue;
-                Status = "Готов. Микрофон выключен";
+                Phase = AssistantPhase.Idle; Level = 0; Status = "Готов к следующей команде.";
                 CycleCompleted?.Invoke(_lastVerified);
-                if (_resumeWake && !_disposed)
-                {
-                    await Task.Delay(700, token);
-                    if (session == _session) Listen();
-                }
+                await ResumeWakeAsync(session, token, 700);
                 break;
         }
     }
+
+    private void StopMicrophone()
+    {
+        _audio.StopCapture(); MicrophoneActive = false;
+    }
+
+    private void Speak(long session, string text, AssistantSettings settings)
+    {
+        _replyVolume = (float)settings.Volume;
+        Send(new { type = "synthesize", session, text, voice = settings.Voice,
+            style = settings.VoiceStyle, amount = settings.RobotAmount, rate = settings.SpeechRate });
+    }
+
+    private async Task ResumeWakeAsync(long session, CancellationToken token, int delay)
+    {
+        if (!_resumeWake || _disposed) return;
+        await Task.Delay(delay, token);
+        if (session == _session) Listen();
+    }
+
+    public void ApplySettings(AssistantSettings settings)
+    {
+        settings = settings.Normalize();
+        _settingsStore.Save(settings);
+        _settings = settings;
+        if (!Busy) RefreshDevices();
+        foreach (var name in new[] { nameof(Settings), nameof(WakeMode), nameof(ModeLabel), nameof(VoiceLabel), nameof(ReduceMotion), nameof(ShowLog) }) OnPropertyChanged(name);
+    }
+
+    public void ClearHistory() => History.Clear();
 
     private void Send(object message)
     { if (_worker?.Send(message) != true) throw new IOException("Голосовой модуль не принимает команды."); }
 
     private void Fail(string text)
     {
-        Stop(); Ready = false; Status = text; Log("Ошибка: " + text); CycleCompleted?.Invoke(false);
+        Stop(); Ready = false; Phase = AssistantPhase.Fault; Status = text; Log("Ошибка: " + text); CycleCompleted?.Invoke(false);
     }
 
     public async ValueTask DisposeAsync()

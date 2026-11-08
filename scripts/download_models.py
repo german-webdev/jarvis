@@ -51,6 +51,11 @@ def main() -> None:
             MODELS / "piper" / Path(filename).name,
         )
     download(manifest["vad"]["url"], MODELS / "silero_vad.onnx")
+    for asset in manifest.get("extra_assets", []):
+        target = (MODELS / asset["path"]).resolve()
+        if not target.is_relative_to(MODELS.resolve()):
+            raise ValueError("Unexpected model destination")
+        download(asset["url"], target)
     wake = manifest["wake"]
     archive = MODELS / "vosk.zip"
     target = MODELS / wake["directory"]

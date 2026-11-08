@@ -16,7 +16,11 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         _viewModel = new MainViewModel(root); DataContext = _viewModel;
-        KeyDown += (_, e) => { if (e.Key == Key.Escape) _viewModel.Stop(); };
+        KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Escape) _viewModel.Stop();
+            if (e.Key == Key.OemComma && Keyboard.Modifiers == ModifierKeys.Control) OpenSettings();
+        };
         Closing += OnClosing;
         var testIndex = Array.IndexOf(args, "--test-audio");
         if (testIndex >= 0 && testIndex + 1 < args.Length)
@@ -44,10 +48,16 @@ public partial class MainWindow : Window
 
     private void ListenClick(object sender, RoutedEventArgs e) => _viewModel.Listen();
     private void StopClick(object sender, RoutedEventArgs e) => _viewModel.Stop();
-    private void RefreshClick(object sender, RoutedEventArgs e) => _viewModel.RefreshDevices();
-    private async void VoiceClick(object sender, RoutedEventArgs e)
-    { try { await _viewModel.TestVoiceAsync(); } catch (Exception ex) { MessageBox.Show(ex.Message); } }
-    private async void RestartClick(object sender, RoutedEventArgs e) => await _viewModel.RestartAsync();
+    private void SettingsClick(object sender, RoutedEventArgs e) => OpenSettings();
+    private void OpenSettings()
+    {
+        _viewModel.Stop();
+        new SettingsWindow(_viewModel) { Owner = this }.ShowDialog();
+    }
+    private void ClearHistoryClick(object sender, RoutedEventArgs e) => _viewModel.ClearHistory();
+    private void ExitClick(object sender, RoutedEventArgs e) => Close();
+    private void HelpClick(object sender, RoutedEventArgs e) => MessageBox.Show(this,
+        "Открой браузер\nЗапусти браузер, пожалуйста\nДжарвис → пауза → открой браузер\n\nСпособ активации, голос и микрофон — в настройках.\nСтоп и Esc выключают прослушивание.", "Команды Джарвиса");
     private async void OnClosing(object? sender, CancelEventArgs e)
     {
         if (_closed) return;

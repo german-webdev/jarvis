@@ -9,7 +9,9 @@
     "files": [
       "ru/ru_RU/dmitri/medium/ru_RU-dmitri-medium.onnx",
       "ru/ru_RU/dmitri/medium/ru_RU-dmitri-medium.onnx.json",
-      "ru/ru_RU/dmitri/medium/MODEL_CARD"
+      "ru/ru_RU/dmitri/medium/MODEL_CARD",
+      "ru/ru_RU/denis/medium/ru_RU-denis-medium.onnx",
+      "ru/ru_RU/denis/medium/ru_RU-denis-medium.onnx.json"
     ]
   },
   "vad": {
@@ -23,7 +25,10 @@
   "sha256": {
     "silero_vad.onnx": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
     "vosk.zip": "961d5ff98a17f4aa6de69864d0aa71fa5bac682301d2b5d17a3f24c5c99a46d4",
+    "piper/denis-MODEL_CARD": "8b5d685dd80f8ad3f8dbbe1c56b16bb0809f00c144af3642dbcf3b707eb89c12",
     "piper/MODEL_CARD": "6d59c756776d57860232cea6484e1b2ea1fc1c8d2c3446ef246f706fd9875821",
+    "piper/ru_RU-denis-medium.onnx": "15fab56e11a097858ee115545d0f697fc2a316c41a291a5362349fb870411b0a",
+    "piper/ru_RU-denis-medium.onnx.json": "831c860dac0b5073eaa81610a0a638ec23d90a6cf8e5f871b4485c2cec3767c8",
     "piper/ru_RU-dmitri-medium.onnx": "f073356ebc4bd0f80c5af58df2953a5988bd5bdab1eb38635ce960b071fbefcb",
     "piper/ru_RU-dmitri-medium.onnx.json": "667ef3117bc642c2892dff7690d8bdc8ca4228aeaa783b2dc1416df632855e0d",
     "vosk-model-small-ru-0.22/README": "b662517cacda14945e159538d6dd8faff23bd706e024c4fb338b6013c9939b9e",
@@ -44,5 +49,11 @@
     "vosk-model-small-ru-0.22/ivector/online_cmvn.conf": "a2f3571754b64297cb7efb2e7ca3df61995c5a45fcbb97188f90613552bb2dfe",
     "vosk-model-small-ru-0.22/ivector/splice.conf": "9f0c5f7c82d18eaf25d8bce470efa9f7741f88411fe428774bc0a9bb69a24756",
     "vosk-model-small-ru-0.22/graph/phones/word_boundary.int": "23081404fe1cc7338c013a4beec133637147d60472c06ab64ff88ee3d028a7b5"
-  }
+  },
+  "extra_assets": [
+    {
+      "url": "https://huggingface.co/rhasspy/piper-voices/resolve/e7229f7d33a10e145e109b886d661984201ac3c4/ru/ru_RU/denis/medium/MODEL_CARD",
+      "path": "piper/denis-MODEL_CARD"
+    }
+  ]
 }

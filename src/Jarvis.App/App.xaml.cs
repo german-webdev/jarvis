@@ -14,13 +14,18 @@ public partial class App : Application
     {
         base.OnStartup(e);
         if (e.Args.FirstOrDefault() == "--focus-window") { Shutdown(WindowFocus.Run(e.Args)); return; }
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null && !File.Exists(Path.Combine(directory.FullName, "pyproject.toml"))) directory = directory.Parent;
-        if (directory == null) { MessageBox.Show(Ui.Text("Не найдена папка проекта. Запускай JARVIS через Start-Jarvis.cmd.")); Shutdown(1); return; }
+        Jarvis.Core.InstallationLayout layout;
+        try { layout = Jarvis.Core.InstallationLayout.Resolve(AppContext.BaseDirectory, Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)); }
+        catch (Exception ex) { MessageBox.Show(Ui.Text(ex.Message)); Shutdown(1); return; }
+        if (e.Args.Length == 2 && e.Args[0] == "--check-installation")
+        {
+            Shutdown(await InstallationCheck.RunAsync(layout, e.Args[1])); return;
+        }
+        Directory.CreateDirectory(layout.UserRoot);
         if (e.Args.Length == 2 && e.Args[0] == "--scan-apps")
         {
             var path = Path.GetFullPath(e.Args[1]);
-            if (!path.StartsWith(Path.Combine(directory.FullName, "work") + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) { Shutdown(1); return; }
+            if (!path.StartsWith(Path.Combine(layout.UserRoot, "work") + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) { Shutdown(1); return; }
             try
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(path)!);
@@ -39,7 +44,7 @@ public partial class App : Application
             _instance.Dispose(); _instance = null; Shutdown(); return;
         }
         _showWindow = new EventWaitHandle(false, EventResetMode.AutoReset, "Local\\JarvisVoicePrototype.Show");
-        var window = new MainWindow(directory.FullName, e.Args);
+        var window = new MainWindow(layout.UserRoot, e.Args);
         _showWait = ThreadPool.RegisterWaitForSingleObject(_showWindow, (_, _) =>
             Dispatcher.BeginInvoke(window.ShowFromTray), null, Timeout.Infinite, executeOnlyOnce: false);
         MainWindow = window; window.Show();

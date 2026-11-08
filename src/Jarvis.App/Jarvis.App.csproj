@@ -4,9 +4,10 @@
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <UseWPF>true</UseWPF>
     <AssemblyName>Jarvis</AssemblyName>
+    <Version>0.10.0</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\jarvis.ico</ApplicationIcon>
-    <AppHostDotNetSearch>AppRelative;EnvironmentVariable;Global</AppHostDotNetSearch>
+    <AppHostDotNetSearch>AppLocal;AppRelative;EnvironmentVariable;Global</AppHostDotNetSearch>
     <AppHostRelativeDotNet>..\..\.tools\dotnet</AppHostRelativeDotNet>
   </PropertyGroup>
   <ItemGroup>

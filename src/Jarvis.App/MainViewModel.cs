@@ -404,7 +404,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     }
     private string Vocabulary()
     {
-        if (_powerConfirmation.HasPending) return "да подтверждаю, подтверждаю, отмена, нет, стоп";
+        if (_powerConfirmation.HasPending) return "подтверждаю, отмена, нет, стоп";
         var enabled = (_conversation.ChoosingWindow ? _runningTargets : CommandTargets).Where(t => t.Enabled).ToArray();
         if (_conversation.HasPending)
             enabled = enabled.Where(t => _conversation.CandidateIds.Contains(t.Id)).ToArray();
@@ -542,7 +542,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         { _conversation.Clear(); _powerConfirmation.Clear(); Busy = false; Status = "Для голосового выбора нужен микрофон. Повтори команду."; return; }
         var session = NewSession(); _acceptTranscript = true; Busy = true;
         Phase = AssistantPhase.Listening; Status = _powerConfirmation.HasPending
-            ? "Скажи «Да, подтверждаю» или «Отмена». Жду 10 секунд."
+            ? "Скажи «Подтверждаю» или «Отмена». Жду 10 секунд."
             : "Назови часть или вариант. Повторять «Джарвис» не нужно. Жду 10 секунд.";
         _deadline = DateTime.UtcNow.AddSeconds(24);
         try

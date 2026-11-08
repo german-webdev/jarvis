@@ -21,7 +21,10 @@ public sealed class WorkerClient : IAsyncDisposable
 
     public void Start(string root)
     {
-        var start = new ProcessStartInfo(Path.Combine(root, ".venv", "Scripts", "python.exe"))
+        var assets = Jarvis.Core.InstallationLayout.AssetRoot(AppContext.BaseDirectory, root);
+        var installed = File.Exists(Path.Combine(assets, Jarvis.Core.InstallationLayout.Marker));
+        var python = installed ? Path.Combine(assets, "runtime", "python", "python.exe") : Path.Combine(assets, ".venv", "Scripts", "python.exe");
+        var start = new ProcessStartInfo(python)
         {
             WorkingDirectory = root, UseShellExecute = false, CreateNoWindow = true,
             RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true,
@@ -29,8 +32,10 @@ public sealed class WorkerClient : IAsyncDisposable
             StandardErrorEncoding = Encoding.UTF8
         };
         start.ArgumentList.Add("-u"); start.ArgumentList.Add("-m"); start.ArgumentList.Add("jarvis_speech.worker");
-        start.Environment["PYTHONPATH"] = Path.Combine(root, "speech");
+        start.Environment["PYTHONPATH"] = Path.Combine(assets, "speech");
         start.Environment["PYTHONIOENCODING"] = "utf-8";
+        start.Environment["PYTHONNOUSERSITE"] = "1";
+        start.Environment["PYTHONDONTWRITEBYTECODE"] = "1";
         start.Environment["HF_HUB_OFFLINE"] = "1";
         start.Environment["OMP_NUM_THREADS"] = "4";
         _process = Process.Start(start) ?? throw new InvalidOperationException("Не удалось запустить голосовой модуль.");

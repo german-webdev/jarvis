@@ -3,7 +3,8 @@ using System.Text.RegularExpressions;
 namespace Jarvis.Core;
 
 public enum Intent { OpenBrowser, Cancel, Unknown, LaunchTarget, Screenshot, OpenScreenshots, VolumeUp, VolumeDown, SetVolume, Mute, Unmute, Time, Date, Help,
-    CloseTarget, FocusTarget, MinimizeWindow, CloseWindow, OpenTargetFolder, MediaPause, MediaPlay, MediaNext, MediaPrevious, StartMusic, MusicVolumeUp, MusicVolumeDown }
+    CloseTarget, FocusTarget, MinimizeWindow, CloseWindow, OpenTargetFolder, MediaPause, MediaPlay, MediaNext, MediaPrevious, StartMusic, MusicVolumeUp, MusicVolumeDown,
+    ExitAssistant, AssistantPresent, HowAreYou }
 public record CommandRequest(Intent Intent, string? TargetId = null, int? Value = null, string? Explanation = null, string[]? CandidateIds = null, Intent? CandidateIntent = null);
 
 public static partial class CommandRouter
@@ -17,8 +18,12 @@ public static partial class CommandRouter
         phrase = Politeness().Replace(phrase, "").Trim();
         // Observed ASR omission in volume commands; do not rewrite arbitrary application names.
         phrase = Regex.Replace(phrase, @"^делай (?=(?:по)?(?:тише|тиши|громче|громчи)$)", "сделай ");
-        if (text.Contains('?') && phrase is not ("сколько времени" or "который час" or "какое сегодня число" or "что ты умеешь")) return new(Intent.Unknown);
+        if (text.Contains('?') && phrase is not ("сколько времени" or "который час" or "какое сегодня число" or "что ты умеешь" or "как дела" or "как у тебя дела")) return new(Intent.Unknown);
         if (phrase is "отмена" or "отмени") return new(Intent.Cancel);
+        if (phrase is "закрой себя" or "выключи себя" or "заверши свою работу"
+            || Regex.IsMatch(phrase, @"^(?:закрой|выключи) (?:джарвис|джарвиса|джервис|джарвиз|чарвис|jarvis)$")) return new(Intent.ExitAssistant);
+        if (Regex.IsMatch(phrase, @"^(?:открой|запусти) (?:джарвис|джарвиса|джервис|джарвиз|чарвис|jarvis)$")) return new(Intent.AssistantPresent);
+        if (phrase is "как дела" or "как у тебя дела") return new(Intent.HowAreYou);
         if (OpenPhrase().IsMatch(phrase)) return new(Intent.OpenBrowser);
         if (phrase is "включи музыку" or "запусти музыку" or "давай музыку")
         {

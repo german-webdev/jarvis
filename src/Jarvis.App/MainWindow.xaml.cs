@@ -24,6 +24,7 @@ public partial class MainWindow : Window
         Ui.Apply(new Jarvis.Core.SettingsStore(Path.Combine(root, "data", "settings.json")).Load().Settings.InterfaceLanguage);
         InitializeComponent();
         _viewModel = new MainViewModel(root); DataContext = _viewModel;
+        _viewModel.ExitRequested += () => Dispatcher.BeginInvoke(RequestExit);
         _tray = new TrayIcon(_viewModel, ShowFromTray, OpenSettings, RequestExit, () => IsEnabled && !_closing);
         KeyDown += (_, e) =>
         {

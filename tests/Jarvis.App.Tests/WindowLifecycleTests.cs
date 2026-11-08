@@ -138,6 +138,18 @@ public class WindowLifecycleTests
                     closed = false;
                     window.Closed += (_, _) => closed = true;
                     window.Show();
+                    var selfRuntime = (MainViewModel)window.DataContext;
+                    // Text exit needs no speech worker, microphone, account or external app.
+                    typeof(MainViewModel).GetProperty(nameof(MainViewModel.Ready))!.SetValue(selfRuntime, true);
+                    await selfRuntime.RunTextAsync("закрой себя");
+                    await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+                    Assert.True(closed);
+                    Assert.False(selfRuntime.MicrophoneActive);
+
+                    window = new MainWindow(root, []) { WindowStartupLocation = WindowStartupLocation.Manual, Left = -10000, Top = -10000, ShowActivated = false, ShowInTaskbar = false };
+                    closed = false;
+                    window.Closed += (_, _) => closed = true;
+                    window.Show();
                     window.EndWindowsSession();
                     window.Close();
                     Assert.True(closed);

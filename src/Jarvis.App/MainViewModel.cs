@@ -46,6 +46,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private bool _acceptTranscript;
     private bool _resumeWake;
     private bool _followUp;
+    private bool _exitAfterSpeech;
     private DateTime _deadline = DateTime.MaxValue;
     private bool _disposed;
     private bool _restarting;
@@ -94,6 +95,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private readonly List<string> _rawHistory = [];
     public event Action? Initialized;
     public event Action<bool>? CycleCompleted;
+    public event Action? ExitRequested;
 
     public MainViewModel(string root, IReadOnlyList<LaunchTarget>? targets = null, SkillDispatcher? skills = null)
     {
@@ -220,6 +222,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
     public void Stop(bool keepChoice = false)
     {
+        _exitAfterSpeech = false;
         if (!keepChoice) _conversation.Clear();
         _askingChoice = false; _voiceInteraction = false;
         _acceptTranscript = false;
@@ -347,6 +350,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
                 _deadline = DateTime.UtcNow.AddSeconds(90);
                 await _audio.PlayAsync(Convert.FromBase64String(message.GetProperty("wav").GetString()!), token, _replyVolume);
                 if (session != _session) return;
+                if (_exitAfterSpeech) { _exitAfterSpeech = false; ExitRequested?.Invoke(); break; }
                 Busy = false; _deadline = DateTime.MaxValue;
                 Phase = AssistantPhase.Idle; Level = 0; Status = "Готов к следующей команде.";
                 if (_askingChoice && _conversation.HasPending)
@@ -421,6 +425,16 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         }
         var wasChoosing = _conversation.HasPending;
         var preliminary = CommandRouter.Resolve(text, CommandTargets, musicTargetId: Settings.MusicTargetId);
+        if (preliminary.Intent == Intent.ExitAssistant)
+        {
+            _conversation.Clear(); _askingChoice = false; _resumeWake = false; _followUp = false;
+            StopMicrophone(); _acceptTranscript = false;
+            Reply = "Завершаю работу. До встречи."; Log(Reply);
+            if (!_voiceInteraction) { ExitRequested?.Invoke(); return; }
+            _exitAfterSpeech = true; Phase = AssistantPhase.Synthesizing; Status = "Завершаю работу JARVIS…";
+            _deadline = DateTime.UtcNow.AddSeconds(15); Speak(session, Reply, Settings); return;
+        }
+        if (preliminary.Intent is Intent.AssistantPresent or Intent.HowAreYou) _conversation.Clear();
         if (_conversation.ChoosingWindow || preliminary.Intent is Intent.CloseWindow or Intent.MinimizeWindow
             || preliminary.CandidateIntent is Intent.CloseTarget or Intent.FocusTarget)
             _runningTargets = await _windows.CaptureAsync(Targets, token);
@@ -536,6 +550,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
     private void Fail(string text)
     {
+        if (_exitAfterSpeech) { Stop(); ExitRequested?.Invoke(); return; }
         Stop(); Ready = false; Phase = AssistantPhase.Fault; Status = text; Log("Ошибка: " + text); CycleCompleted?.Invoke(false);
     }
 

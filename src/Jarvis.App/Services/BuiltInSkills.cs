@@ -10,6 +10,8 @@ public static class BuiltInSkills
     public const string HelpText = "Открой браузер\nЗапусти приложение [название] / Запусти игру [название]\nОткрой сайт [название] / Открой почту\nПереключись на приложение [название]\nЗакрой приложение [название] / Закрой игру [название]\nЗакрой окно / Сверни окно\nОткрой папку [название] / Открой каталог [название]\nВключи музыку / Пауза / Стоп / Останови / Выключи музыку\nПродолжи / Дальше / Назад / Следующий / Предыдущий\nГромче / Сделай громче / Тише / Сделай потише\nСистему громче / Систему тише / Громкость [число] процентов\nВыключи звук / Включи звук\nСделай скриншот / Открой скриншоты\nСколько времени / Какое сегодня число\nСпроси нейросеть [вопрос] — при настроенном подключении\n\nВместо [название] произнеси название из своего каталога. Каталоги приложений, игр и сайтов доступны в меню JARVIS. Подробная справка с категориями и поиском — в меню «Справка → Что я умею».";
 
     public static SkillDispatcher Create(string root, Func<IReadOnlyList<LaunchTarget>> targets, WindowControl windows, MusicPlayback music) => new([
+        new DelegateSkill([Intent.AssistantPresent], (_, _) => Task.FromResult(new SkillResult(true, "А я кто, просячий хвостик?"))),
+        new DelegateSkill([Intent.HowAreYou], (_, _) => Task.FromResult(new SkillResult(true, "Всё хорошо. На связи и готов помочь."))),
         new DelegateSkill([Intent.CloseTarget, Intent.FocusTarget, Intent.MinimizeWindow, Intent.CloseWindow], windows.ExecuteAsync),
         new DelegateSkill([Intent.MediaPause, Intent.MediaPlay, Intent.MediaNext, Intent.MediaPrevious, Intent.MusicVolumeUp, Intent.MusicVolumeDown], music.ExecuteAsync),
         new DelegateSkill([Intent.StartMusic], music.StartAsync),

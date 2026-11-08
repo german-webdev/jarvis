@@ -377,5 +377,9 @@
   "JARVIS 0.9.2 · локальный голосовой помощник": "JARVIS 0.9.2 · local voice assistant",
   "В режиме ожидания сначала скажи «Джарвис», дождись готовности и произнеси команду. Команды ниже — на русском. Вместо [название] произнеси название из своего каталога; скобки произносить не нужно.": "In wake mode, say “Jarvis”, wait for the cue, then give a command. Commands below are in Russian. Replace [название] with a name from your catalog; do not say the brackets.",
   "Запускай программы, мессенджеры и установленные игры по названию из каталога.": "Launch apps, messengers and installed games by their catalog names.",
-  "При закрытии приложение может предложить сохранить файл или уйти в трей. Для переключения или закрытия по названию его окно должно быть открыто.": "An app may ask you to save a file or minimize to its tray when closed. To switch to or close an app by name, its window must be open."
+  "При закрытии приложение может предложить сохранить файл или уйти в трей. Для переключения или закрытия по названию его окно должно быть открыто.": "An app may ask you to save a file or minimize to its tray when closed. To switch to or close an app by name, its window must be open.",
+  "Сам JARVIS": "JARVIS itself",
+  "Обратись к помощнику или заверши его работу.": "Talk to the assistant or exit the app.",
+  "Первые две команды вызывают заготовленные ответы без нейросети. Закрытие полностью завершает JARVIS, включая работу в трее.": "The first two commands use built-in replies without AI. Closing fully exits JARVIS, including its tray process.",
+  "Завершаю работу JARVIS…": "Exiting JARVIS…"
 }

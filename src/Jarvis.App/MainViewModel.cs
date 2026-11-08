@@ -49,7 +49,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private bool _restarting;
     private string _status = "Подготавливаю голосовой модуль…";
     private string _transcript = "Здесь появится распознанная фраза";
-    private string _reply = "Открой браузер · Запусти браузер";
+    private const string InitialReply = "Здесь появится ответ JARVIS";
+    private string _reply = InitialReply;
     private bool _ready;
     private bool _busy;
     private double _level;
@@ -57,7 +58,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
     public string Status { get => Ui.Text(_status); private set => SetProperty(ref _status, value); }
     public string Transcript { get => _transcript == "Здесь появится распознанная фраза" ? Ui.Text(_transcript) : _transcript; private set => SetProperty(ref _transcript, value); }
-    public string Reply { get => _reply == "Открой браузер · Запусти браузер" ? Ui.Text(_reply) : _reply; private set => SetProperty(ref _reply, value); }
+    public string Reply { get => _reply == InitialReply ? Ui.Text(_reply) : _reply; private set => SetProperty(ref _reply, value); }
     public bool Ready { get => _ready; private set { SetProperty(ref _ready, value); Changed(); } }
     public bool Busy { get => _busy; private set { SetProperty(ref _busy, value); Changed(); } }
     public bool WakeMode => Settings.WakeMode;

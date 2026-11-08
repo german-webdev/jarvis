@@ -32,6 +32,7 @@ public class WindowLifecycleTests
                     await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
                     var runtime = Assert.IsType<MainViewModel>(window.DataContext);
                     Assert.False(runtime.MicrophoneActive);
+                    Assert.Equal("Здесь появится ответ JARVIS", runtime.Reply);
 
                     runtime.ApplySettings(runtime.Settings with { InterfaceLanguage = "en" });
                     Assert.Equal("en", new Jarvis.Core.SettingsStore(Path.Combine(root, "data", "settings.json")).Load().Settings.InterfaceLanguage);
@@ -39,6 +40,7 @@ public class WindowLifecycleTests
                     Assert.Equal("JARVIS · Assistant", window.Title);
                     Assert.Contains(Descendants(window).OfType<MenuItem>(), item => Equals(item.Header, "Exit"));
                     Assert.Equal("Microphone off", runtime.MicrophoneLabel);
+                    Assert.Equal("JARVIS responses will appear here", runtime.Reply);
                     Assert.Equal("Heard the name. Waiting up to 8 seconds for a command…", Ui.Text("Имя услышано. Жду команду до 8 секунд…"));
                     Assert.Equal("12:34:56  Text command: запусти Word", Ui.Text("12:34:56  Команда текстом: запусти Word"));
                     Assert.All(Ui.Translations, pair => Assert.False(string.IsNullOrWhiteSpace(pair.Value)));

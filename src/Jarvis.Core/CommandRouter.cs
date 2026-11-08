@@ -97,7 +97,7 @@ public static partial class CommandRouter
     }
     [GeneratedRegex(@"[^\p{L}\p{N}\s]")] private static partial Regex Punctuation();
     [GeneratedRegex(@"\s+")] private static partial Regex Spaces();
-    [GeneratedRegex(@"^(?:джарвис|джарвисc|jarvis)\s+")] private static partial Regex WakePrefix();
+    [GeneratedRegex(@"^(?:джарвис|джарвисc|джервис|джарвиз|чарвис|jarvis)\s+")] private static partial Regex WakePrefix();
     [GeneratedRegex(@"^пожалуйста | пожалуйста$")] private static partial Regex Politeness();
     [GeneratedRegex(@"^(?:открой|запусти|включи)(?: пожалуйста)?(?: мне)?(?: интернет)? браузер$")] private static partial Regex OpenPhrase();
     [GeneratedRegex(@"^(?:установи |поставь |сделай )?громкость(?: на)? ([а-я0-9 ]+?)(?: процентов| процента| процент)?$")] private static partial Regex VolumePhrase();

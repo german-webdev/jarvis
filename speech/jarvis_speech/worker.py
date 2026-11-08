@@ -37,8 +37,10 @@ def main():
     sys.stdout.reconfigure(encoding="utf-8", errors="strict")
     sys.stdin.reconfigure(encoding="utf-8", errors="strict")
     root = Path(__file__).resolve().parents[2]
+    session = 0
     try:
-        engine = Engine(root, lambda text: emit("loading", text=text))
+        engine = Engine(root, lambda text: emit("loading", text=text),
+                        wake_observer=lambda text: emit("wake_heard", session, text=text))
     except Exception as error:
         traceback.print_exc(file=sys.stderr)
         emit("fatal", text=f"Не удалось загрузить голосовой модуль: {error}")
@@ -46,7 +48,6 @@ def main():
     inbox = queue.Queue(maxsize=128)
     threading.Thread(target=read_commands, args=(inbox,), daemon=True).start()
     emit("ready", protocol=1, asr="small/cpu/int8", voice="ru_RU-dmitri-medium")
-    session = 0
     interaction = Interaction(engine, lambda kind, **values: emit(kind, session, **values))
 
     def transcribe(pcm):

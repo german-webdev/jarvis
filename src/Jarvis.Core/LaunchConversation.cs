@@ -24,7 +24,7 @@ public sealed class LaunchConversation
     {
         var request = CommandRouter.Resolve(text, targets, running, musicTargetId);
         var answer = CommandRouter.Normalize(text);
-        answer = Regex.Replace(answer, @"^(?:джарвис|jarvis) | пожалуйста$", "");
+        answer = Regex.Replace(answer, @"^(?:джарвис|джервис|джарвиз|чарвис|jarvis) | пожалуйста$", "");
         if (HasPending && request.Intent == Intent.MediaPause && answer is "стоп" or "останови")
         { Clear(); return new(new(Intent.Cancel)); }
         if (request.Intent == Intent.Cancel || answer is "нет" or "не надо" or "ничего") { Clear(); return new(new(Intent.Cancel)); }

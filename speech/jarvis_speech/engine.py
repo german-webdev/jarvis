@@ -8,6 +8,7 @@ import numpy as np
 import onnxruntime as ort
 
 from jarvis_speech.voice_effects import apply_effect
+from jarvis_speech.wake import WAKE_NAMES
 
 
 class Vad:
@@ -35,12 +36,13 @@ class Vad:
 
 
 class Engine:
-    def __init__(self, root: Path, progress):
+    def __init__(self, root: Path, progress, wake_observer=None):
         from faster_whisper import WhisperModel
         from piper import PiperVoice
         from vosk import KaldiRecognizer, Model, SetLogLevel
 
         models = root / "models"
+        self.wake_observer = wake_observer or (lambda text: None)
         progress("Загружаю определение речи…")
         self.vad = Vad(models / "silero_vad.onnx")
         progress("Загружаю распознавание речи…")
@@ -75,13 +77,17 @@ class Engine:
         value = json.loads(self.wake.Result() if final else self.wake.PartialResult())
         words = value.get("text", value.get("partial", "")).lower().split()
         # No broad fuzzy matching: similar TV words must not activate commands.
-        if not ({"джарвис", "jarvis"} & set(words)):
+        if not (WAKE_NAMES & set(words)):
+            if final and words:
+                self.wake_observer(value.get("text", "")[:100])
             return None
         # Finalize only after the fast partial match; stable partial timestamps are much slower.
         result = value if final else json.loads(self.wake.FinalResult())
         for word in result.get("result", []):
-            if word["word"] in {"джарвис", "jarvis"}:
+            if word["word"] in WAKE_NAMES:
                 return round(word["end"] * 16000)
+        if result.get("text"):
+            self.wake_observer(result["text"][:100])
         return None
 
     def reset(self):

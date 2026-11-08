@@ -4,11 +4,12 @@ import re
 from collections import deque
 
 from jarvis_speech.segmenter import FRAME_BYTES, FRAME_SECONDS, Segmenter
+from jarvis_speech.wake import WAKE_NAMES
 
 
 def address_only(text: str) -> bool:
     words = re.findall(r"[а-яёa-z]+", text.lower())
-    return bool(words) and all(w in {"джарвис", "джервис", "чарвис", "джарвиз", "jarvis"} for w in words)
+    return bool(words) and all(w in WAKE_NAMES for w in words)
 
 
 class Interaction:

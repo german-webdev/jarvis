@@ -271,6 +271,10 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         var token = _operation.Token;
         switch (type)
         {
+            case "wake_heard":
+                if (Phase == AssistantPhase.WaitingForName)
+                    Log("В ожидании имени услышал: «" + Text() + "»");
+                break;
             case "activated":
                 Phase = AssistantPhase.Listening;
                 Status = $"Имя услышано. Жду команду до {Settings.CommandWaitSeconds} секунд…";

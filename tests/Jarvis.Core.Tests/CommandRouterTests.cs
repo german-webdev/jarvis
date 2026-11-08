@@ -7,6 +7,9 @@ public class CommandRouterTests
 {
     [Theory]
     [InlineData("Джарвис, открой браузер.")]
+    [InlineData("Джервис, открой браузер.")]
+    [InlineData("Джарвиз, открой браузер.")]
+    [InlineData("Чарвис, открой браузер.")]
     [InlineData("Запусти браузер")]
     [InlineData("пожалуйста открой мне браузер")]
     [InlineData("Jarvis, включи интернет браузер!")]
@@ -19,6 +22,8 @@ public class CommandRouterTests
     [InlineData("открой браузер?")]
     [InlineData("открой браузер и выключи компьютер")]
     [InlineData("я сказал ему открой браузер")]
+    [InlineData("сервис открой браузер")]
+    [InlineData("чарльз открой браузер")]
     [InlineData("")]
     public void RejectsAmbiguousOrUnsupportedRequests(string text) => Assert.Equal(Intent.Unknown, CommandRouter.Parse(text));
 

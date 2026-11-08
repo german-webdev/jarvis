@@ -62,16 +62,24 @@ public class MusicSelectionTests
             Assert.Equal("one", CommandRouter.Resolve("Запусти " + name, [app]).TargetId);
     }
     [Theory]
-    [InlineData("ward")][InlineData("wardo")][InlineData("ворд")][InlineData("wardogs")]
-    public void WordAndWardogsAskInsteadOfGuessing(string name)
+    [InlineData("Word", "word")][InlineData("ward", "word")][InlineData("wardo", "word")]
+    [InlineData("ворд", "word")][InlineData("WARDOGS", "game")][InlineData("вардогс", "game")]
+    public void UniqueWordAndWardogsNamesLaunchWithoutClarification(string name, string expected)
     {
         var apps = new[] { App("Word", "word"), App("WARDOGS", "game") };
         var dialog = new LaunchConversation(); var now = DateTimeOffset.UtcNow;
-        Assert.True(dialog.Resolve("Запусти " + name, apps, now).NeedsAnswer);
-        Assert.Equal("word", dialog.Resolve("Word", apps, now).Command?.TargetId);
-        var single = CommandRouter.Resolve("Запусти " + name, [apps[0]]);
-        if (name == "wardogs") Assert.Equal(Intent.Unknown, single.Intent);
-        else Assert.Equal("word", single.TargetId);
+        var result = dialog.Resolve("Запусти " + name, apps, now);
+        Assert.False(result.NeedsAnswer);
+        Assert.Equal(Intent.LaunchTarget, result.Command?.Intent);
+        Assert.Equal(expected, result.Command?.TargetId);
+    }
+    [Fact]
+    public void SharedCustomAliasStillRequiresClarification()
+    {
+        var apps = new[] { App("Word", "word"), App("WARDOGS", "game") with { Aliases = ["ворд"] } };
+        var dialog = new LaunchConversation(); var now = DateTimeOffset.UtcNow;
+        Assert.True(dialog.Resolve("Запусти ворд", apps, now).NeedsAnswer);
+        Assert.Equal("word", dialog.Resolve("вариант один", apps, now).Command?.TargetId);
     }
     [Theory][InlineData("эксель")][InlineData("экссель")]
     public void ExcelPronunciations(string name) => Assert.Equal("excel", CommandRouter.Resolve("Запусти " + name, [App("Excel", "excel")]).TargetId);

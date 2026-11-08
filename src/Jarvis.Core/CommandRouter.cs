@@ -64,13 +64,6 @@ public static partial class CommandRouter
     {
         var enabled = (targets ?? []).Where(t => t.Enabled).ToArray();
         var matches = enabled.Where(t => t.Names.Any(n => Normalize(n) == name)).DistinctBy(t => t.Id).ToArray();
-        // Known acoustic collision reported by the user. Ask instead of starting a game on "Word".
-        if (intent == Intent.LaunchTarget && name is "ворд" or "уорд" or "word" or "ward" or "wardo" or "вордо" or "wardogs" or "вардогс" or "вордогс" or "war dogs")
-        {
-            var word = enabled.Where(t => Regex.IsMatch(Normalize(t.Name), @"^(?:microsoft |office )?word(?: \d{4})?$")).ToArray();
-            var games = enabled.Where(t => Normalize(t.Name) == "wardogs").ToArray();
-            if (word.Length > 0 && games.Length > 0) matches = word.Concat(games).DistinctBy(t => t.Id).ToArray();
-        }
         return matches.Length switch
         {
             1 => new(intent, matches[0].Id),

@@ -62,6 +62,10 @@ class Engine:
         self.wake_model = Model(str(models / "vosk-model-small-ru-0.22"))
         self.wake = KaldiRecognizer(self.wake_model, 16000)
         self.wake.SetWords(True)
+        self.vocabulary = "браузер, Джарвис, скриншот, громкость, телеграм, стим, иксбокс"
+
+    def set_vocabulary(self, text=""):
+        self.vocabulary = "браузер, Джарвис, скриншот, громкость, телеграм, стим, иксбокс, " + str(text)[:1500]
 
     def wake_boundary(self, pcm: bytes) -> int | None:
         final = self.wake.AcceptWaveform(pcm)
@@ -90,7 +94,7 @@ class Engine:
             condition_on_previous_text=False,
             vad_filter=False,
             initial_prompt="Джарвис. Браузер. Открой. Запусти. Отмена.",
-            hotwords="браузер, Джарвис",
+            hotwords=self.vocabulary,
             no_speech_threshold=0.6,
         )
         return " ".join(s.text.strip() for s in segments).strip()

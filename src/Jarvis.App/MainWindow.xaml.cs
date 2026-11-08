@@ -3,6 +3,8 @@ using System.IO;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Input;
+using System.Diagnostics;
+using Jarvis.App.Services;
 
 namespace Jarvis.App;
 
@@ -23,6 +25,12 @@ public partial class MainWindow : Window
         };
         Closing += OnClosing;
         var testIndex = Array.IndexOf(args, "--test-audio");
+        var commandIndex = Array.IndexOf(args, "--test-command");
+        if (commandIndex >= 0 && commandIndex + 1 < args.Length)
+        {
+            _viewModel.Initialized += async () => await _viewModel.RunTextAsync(args[commandIndex + 1]);
+            _viewModel.CycleCompleted += success => WriteReport(success, _viewModel.Status);
+        }
         if (testIndex >= 0 && testIndex + 1 < args.Length)
         {
             _viewModel.Initialized += () =>
@@ -43,12 +51,27 @@ public partial class MainWindow : Window
             File.WriteAllText(path, JsonSerializer.Serialize(new { success, status,
                 transcript = _viewModel.Transcript, reply = _viewModel.Reply,
                 history = _viewModel.History.ToArray() }, new JsonSerializerOptions { WriteIndented = true }));
+            if (args.Contains("--exit-after-test")) _ = Dispatcher.BeginInvoke(Close);
         }
     }
 
     private void ListenClick(object sender, RoutedEventArgs e) => _viewModel.Listen();
     private void StopClick(object sender, RoutedEventArgs e) => _viewModel.Stop();
     private void SettingsClick(object sender, RoutedEventArgs e) => OpenSettings();
+    private void CatalogClick(object sender, RoutedEventArgs e)
+    { _viewModel.Stop(); new CatalogWindow(_viewModel) { Owner = this }.ShowDialog(); }
+    private async void TextCommandClick(object sender, RoutedEventArgs e)
+    {
+        _viewModel.Stop();
+        var dialog = new TextCommandWindow { Owner = this };
+        if (dialog.ShowDialog() == true) await _viewModel.RunTextAsync(dialog.Command);
+    }
+    private void ArtifactClick(object sender, RoutedEventArgs e)
+    {
+        if (_viewModel.ArtifactPath is not { } path || !File.Exists(path)) return;
+        try { using var process = Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); }
+        catch (Exception ex) { MessageBox.Show(this, ex.Message, "Не удалось открыть снимок"); }
+    }
     private void OpenSettings()
     {
         _viewModel.Stop();
@@ -57,7 +80,7 @@ public partial class MainWindow : Window
     private void ClearHistoryClick(object sender, RoutedEventArgs e) => _viewModel.ClearHistory();
     private void ExitClick(object sender, RoutedEventArgs e) => Close();
     private void HelpClick(object sender, RoutedEventArgs e) => MessageBox.Show(this,
-        "Открой браузер\nЗапусти браузер, пожалуйста\nДжарвис → пауза → открой браузер\n\nСпособ активации, голос и микрофон — в настройках.\nСтоп и Esc выключают прослушивание.", "Команды Джарвиса");
+        BuiltInSkills.HelpText, "Команды Джарвиса");
     private async void OnClosing(object? sender, CancelEventArgs e)
     {
         if (_closed) return;

@@ -5,7 +5,7 @@
   <Grid>
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
     <Menu Background="#E8EDF3" Foreground="#17283A" Padding="12,2">
-      <MenuItem Header="_Джарвис"><MenuItem Header="Настройки…" InputGestureText="Ctrl+," Click="SettingsClick"/><Separator/><MenuItem Header="Выход" Click="ExitClick"/></MenuItem>
+      <MenuItem Header="_Джарвис"><MenuItem Header="Приложения и игры…" Click="CatalogClick"/><MenuItem Header="Команда текстом…" Click="TextCommandClick"/><Separator/><MenuItem Header="Настройки…" InputGestureText="Ctrl+," Click="SettingsClick"/><Separator/><MenuItem Header="Выход" Click="ExitClick"/></MenuItem>
       <MenuItem Header="_Вид"><MenuItem Header="Журнал событий" IsCheckable="True" IsChecked="{Binding ShowLog}"/><MenuItem Header="Очистить журнал" Click="ClearHistoryClick"/></MenuItem>
       <MenuItem Header="_Справка"><MenuItem Header="Что я умею" Click="HelpClick"/></MenuItem>
     </Menu>
@@ -26,7 +26,7 @@
       <Grid Grid.Row="2" Margin="0,16,0,0">
         <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="14"/><ColumnDefinition/></Grid.ColumnDefinitions>
         <Border Background="#111F30" CornerRadius="12" Padding="18" MinHeight="116"><StackPanel><TextBlock Text="ТВОЯ КОМАНДА" Foreground="#7E99B0" FontSize="10"/><TextBlock Text="{Binding Transcript}" FontSize="17" Margin="0,9,0,0"/></StackPanel></Border>
-        <Border Grid.Column="2" Background="#142333" CornerRadius="12" Padding="18" MinHeight="116"><StackPanel><TextBlock Text="ОТВЕТ ДЖАРВИСА" Foreground="#73CDBD" FontSize="10"/><TextBlock Text="{Binding Reply}" FontSize="17" Margin="0,9,0,0"/></StackPanel></Border>
+        <Border Grid.Column="2" Background="#142333" CornerRadius="12" Padding="18" MinHeight="116"><StackPanel><TextBlock Text="ОТВЕТ ДЖАРВИСА" Foreground="#73CDBD" FontSize="10"/><TextBlock Text="{Binding Reply}" FontSize="17" Margin="0,9,0,0"/><Button Content="Открыть скриншот" Click="ArtifactClick" HorizontalAlignment="Left" Margin="0,10,0,0" Padding="10,5" Visibility="{Binding HasArtifact, Converter={StaticResource BoolVisibility}}"/></StackPanel></Border>
       </Grid>
       <Border Grid.Row="3" Margin="0,18,0,0" Visibility="{Binding ShowLog, Converter={StaticResource BoolVisibility}}">
         <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="110"/></Grid.RowDefinitions>

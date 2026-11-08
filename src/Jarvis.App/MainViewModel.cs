@@ -15,6 +15,13 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private readonly string _root;
     private readonly AudioService _audio = new();
     private readonly SettingsStore _settingsStore;
+    private readonly LaunchCatalogStore _catalogStore;
+    private readonly SkillDispatcher _skills;
+    private List<LaunchTarget> _targets = [];
+    private string? _artifactPath;
+    public IReadOnlyList<LaunchTarget> Targets => _targets;
+    public string? ArtifactPath { get => _artifactPath; private set { SetProperty(ref _artifactPath, value); OnPropertyChanged(nameof(HasArtifact)); } }
+    public bool HasArtifact => ArtifactPath != null;
     private AssistantSettings _settings = new();
     private AssistantPhase _phase = AssistantPhase.Loading;
     private bool _microphoneActive;
@@ -75,6 +82,10 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     public MainViewModel(string root)
     {
         _root = root;
+        _catalogStore = new(Path.Combine(root, "data", "apps.json"));
+        var catalog = _catalogStore.Load(); _targets = catalog.Targets;
+        if (catalog.Warning != null) Log(catalog.Warning);
+        _skills = BuiltInSkills.Create(root, () => Targets);
         _settingsStore = new SettingsStore(Path.Combine(root, "data", "settings.json"));
         var loaded = _settingsStore.Load();
         _settings = loaded.Settings;
@@ -166,7 +177,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         _deadline = WakeMode ? DateTime.MaxValue : DateTime.UtcNow.AddSeconds(Settings.CommandWaitSeconds + 14);
         try
         {
-            Send(new { type = "start", session, mode = WakeMode ? "wake" : "command", wait_seconds = Settings.CommandWaitSeconds });
+            Send(new { type = "start", session, mode = WakeMode ? "wake" : "command", wait_seconds = Settings.CommandWaitSeconds, vocabulary = Vocabulary() });
             _audio.Start(SelectedMicrophone!.Id);
             MicrophoneActive = true;
             Log(WakeMode ? "Ожидание имени включено" : "Микрофон включён");
@@ -217,7 +228,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         _resumeWake = false;
         Busy = true;
         _deadline = DateTime.UtcNow.AddSeconds(45);
-        Send(new { type = "transcribe", session, pcm = Convert.ToBase64String(buffer.ToArray()) });
+        Send(new { type = "transcribe", session, pcm = Convert.ToBase64String(buffer.ToArray()), vocabulary = Vocabulary() });
     }
 
     private bool _lastVerified;
@@ -271,19 +282,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
                 StopMicrophone(); Transcript = Text();
                 var elapsed = message.GetProperty("elapsed_ms").GetInt32();
                 Log($"Распознавание: {elapsed} мс · {Transcript}");
-                var intent = CommandRouter.Parse(Transcript);
-                _lastVerified = false;
-                if (intent == Intent.OpenBrowser)
-                {
-                    Phase = AssistantPhase.Executing; Status = "Открываю браузер…";
-                    var result = await BrowserLauncher.OpenAsync(token);
-                    if (session != _session) return;
-                    _lastVerified = result.Verified; Reply = result.Message;
-                }
-                else Reply = intent == Intent.Cancel ? "Отменено." : "Команду не понял. Попробуй сказать: открой браузер.";
-                Log(Reply); Phase = AssistantPhase.Synthesizing; Status = "Готовлю ответ…";
-                _deadline = DateTime.UtcNow.AddSeconds(30);
-                Speak(session, Reply, Settings); break;
+                await ExecuteAsync(Transcript, session, token); break;
             case "speech":
                 Phase = AssistantPhase.Speaking; Status = "Можно остановить ответ кнопкой «Стоп».";
                 await _audio.PlayAsync(Convert.FromBase64String(message.GetProperty("wav").GetString()!), token, _replyVolume);
@@ -299,6 +298,48 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private void StopMicrophone()
     {
         _audio.StopCapture(); MicrophoneActive = false;
+    }
+
+    public void SaveCatalog(IEnumerable<LaunchTarget> targets)
+    {
+        var updated = targets.ToList(); _catalogStore.Save(updated); _targets = updated;
+        OnPropertyChanged(nameof(Targets)); Log($"Каталог сохранён · включено {_targets.Count(t => t.Enabled)}");
+    }
+    private string Vocabulary()
+    {
+        var enabled = Targets.Where(t => t.Enabled).ToArray();
+        return string.Join(", ", enabled.SelectMany(t => t.Aliases ?? []).Concat(enabled.Where(t => t.Kind == "steam").Select(t => t.Name))
+            .Concat(enabled.Select(t => t.Name)).Distinct().Take(80));
+    }
+
+    public async Task RunTextAsync(string text)
+    {
+        if (!CanSpeak || string.IsNullOrWhiteSpace(text)) return;
+        var session = NewSession(); Busy = true; _resumeWake = false; _acceptTranscript = false;
+        Transcript = text.Trim(); Log("Команда текстом: " + Transcript);
+        try { await ExecuteAsync(Transcript, session, _operation.Token); }
+        catch (OperationCanceledException) { }
+        catch (Exception ex) { Fail(ex.Message); }
+    }
+
+    private async Task ExecuteAsync(string text, long session, CancellationToken token)
+    {
+        Phase = AssistantPhase.Executing; Status = "Выполняю команду…";
+        _deadline = DateTime.UtcNow.AddSeconds(30);
+        ArtifactPath = null;
+        var result = await _skills.ExecuteAsync(CommandRouter.Resolve(text, Targets), token);
+        if (session != _session) return;
+        _lastVerified = result.Verified; Reply = result.Message; ArtifactPath = result.ArtifactPath;
+        Log(Reply);
+        if (ArtifactPath != null) Log(ArtifactPath);
+        if (result.Silent)
+        {
+            Busy = false; _deadline = DateTime.MaxValue; Phase = AssistantPhase.Idle;
+            Status = "Готов. Ответ показан на экране."; CycleCompleted?.Invoke(_lastVerified);
+            await ResumeWakeAsync(session, token, 200); return;
+        }
+        Phase = AssistantPhase.Synthesizing; Status = "Готовлю ответ…";
+        _deadline = DateTime.UtcNow.AddSeconds(30); Speak(session, Reply, Settings);
     }
 
     private void Speak(long session, string text, AssistantSettings settings)

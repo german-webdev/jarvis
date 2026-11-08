@@ -63,6 +63,7 @@ def main():
             if kind == "quit":
                 return 0
             if kind == "start":
+                engine.set_vocabulary(command.get("vocabulary", ""))
                 session = int(incoming)
                 mode = command.get("mode", "command")
                 interaction.start(mode, float(command.get("wait_seconds", 8)))
@@ -82,6 +83,7 @@ def main():
                 )
                 emit("speech", incoming, wav=base64.b64encode(wav).decode("ascii"))
             elif kind == "transcribe":
+                engine.set_vocabulary(command.get("vocabulary", ""))
                 session = int(incoming)
                 interaction.reset()
                 pcm = base64.b64decode(command["pcm"], validate=True)

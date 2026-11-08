@@ -43,7 +43,7 @@
         <TextBlock Text="Волна реагирует на уровень микрофона и голосового ответа. Журнал хранится только до закрытия приложения." Style="{StaticResource Hint}"/>
         <TextBlock Text="Диагностика" Style="{StaticResource Label}"/><Button Content="Перезапустить голосовой модуль" Click="RestartClick" HorizontalAlignment="Left" Margin="0,4,0,0"/>
         <TextBlock Text="Используй, если распознавание или голос перестали отвечать. Настройки сохраняются." Style="{StaticResource Hint}"/>
-        <TextBlock Text="JARVIS 0.2 · локальный голосовой помощник" Foreground="#69859E" FontSize="12" Margin="0,28,0,0"/>
+        <TextBlock Text="JARVIS 0.3 · локальный голосовой помощник" Foreground="#69859E" FontSize="12" Margin="0,28,0,0"/>
       </StackPanel></TabItem>
     </TabControl>
     <TextBlock Grid.Row="2" Text="{Binding Runtime.Status}" Foreground="#91ACBF" FontSize="12" Margin="0,14,0,14" MinHeight="32"/>

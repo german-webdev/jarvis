@@ -69,7 +69,6 @@ public sealed partial class MainViewModel
         var revision = Ai.ConnectionRevision;
         bool Current() => !_disposed && session == _session && revision == Ai.ConnectionRevision && !token.IsCancellationRequested;
         _aiResponseSession = session;
-        SourceUrl = null;
         _askingChoice = false; VideoResults.Clear(); SetBrowserPending(true);
         Phase = AssistantPhase.Executing; _deadline = DateTime.UtcNow.AddSeconds(40);
         BrowserStatus = Status = query != null ? "Ищу видео в управляемом браузере…" : "Открываю выбранное видео…";

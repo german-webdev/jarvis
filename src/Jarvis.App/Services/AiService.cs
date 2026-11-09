@@ -10,6 +10,7 @@ public sealed class AiService : IDisposable
 {
     private readonly HttpClient _http;
     internal Func<Action<string>?, CancellationToken, Task<IAiToolSession>> OpenBrowserTools { get; set; }
+    internal Action<Uri, CancellationToken> OpenBrowserPage { get; set; } = BrowserLauncher.OpenPage;
     private readonly object _gate = new();
     private CancellationTokenSource? _pending;
     private bool _browserToolsPending;
@@ -151,8 +152,20 @@ public sealed class AiService : IDisposable
                 }
             }
             var result = await request.WaitAsync(timeout.Token);
-            timeout.Token.ThrowIfCancellationRequested();
-            if (revisionAtStart != ConnectionRevision) throw new OperationCanceledException();
+            lock (_gate)
+            {
+                timeout.Token.ThrowIfCancellationRequested();
+                if (revisionAtStart != ConnectionRevision) throw new OperationCanceledException();
+                if (useBrowserTools && result.Verified && result.SourceUrl is { } source)
+                {
+                    if (!PlaywrightBrowserTools.TryPublicPage(source, out var address))
+                        return new(false, "Адрес страницы не подтверждён.");
+                    try { OpenBrowserPage(address, timeout.Token); }
+                    catch (Exception error) when (error is System.ComponentModel.Win32Exception or InvalidOperationException)
+                    { return new(false, "Не удалось открыть страницу в браузере по умолчанию."); }
+                    return result with { Message = "Выполнено." };
+                }
+            }
             return result with { Message = HttpAiClient.CleanAnswer(result.Message) };
         }
         catch (Exception) when (token.IsCancellationRequested || revisionAtStart != ConnectionRevision)

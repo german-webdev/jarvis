@@ -14,10 +14,17 @@ public static class BrowserLauncher
         token.ThrowIfCancellationRequested();
         if (!site.Enabled || !site.IsValid || site.Kind != "url" || !WebSites.TryNormalizeAddress(site.Target, out var address))
             return Task.FromResult(new SkillResult(false, "Адрес сайта неверный или сайт выключен в каталоге."));
-        using var process = Process.Start(new ProcessStartInfo(address) { UseShellExecute = true });
+        OpenPage(new Uri(address), token);
         // The OS accepted the URL; this does not prove that the page loaded successfully.
         return Task.FromResult(new SkillResult(false, $"Открываю сайт {site.Name}."));
     }
+
+    internal static void OpenPage(Uri address, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        using var process = Process.Start(new ProcessStartInfo(address.AbsoluteUri) { UseShellExecute = true });
+    }
+
     // Read the registered https handler; do not parse or execute its shell command string.
     public static string? GetDefaultExecutable()
     {

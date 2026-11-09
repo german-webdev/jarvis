@@ -43,12 +43,9 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     public event Action<string>? ClarificationReady;
     private List<LaunchTarget> _targets = [];
     private string? _artifactPath;
-    private string? _sourceUrl;
     public IReadOnlyList<LaunchTarget> Targets => _targets;
     public string? ArtifactPath { get => _artifactPath; private set { SetProperty(ref _artifactPath, value); OnPropertyChanged(nameof(HasArtifact)); } }
     public bool HasArtifact => ArtifactPath != null;
-    public string? SourceUrl { get => _sourceUrl; private set { SetProperty(ref _sourceUrl, value); OnPropertyChanged(nameof(HasSourceUrl)); } }
-    public bool HasSourceUrl => SourceUrl != null;
     private AssistantSettings _settings = new();
     private AssistantPhase _phase = AssistantPhase.Loading;
     private bool _microphoneActive;
@@ -287,7 +284,6 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     private void StopTask()
     {
         Stop();
-        SourceUrl = null;
         Reply = Ui.Text("Задача остановлена. Уже выполненные действия не отменены.");
     }
 
@@ -561,7 +557,6 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         Phase = AssistantPhase.Executing; Status = "Выполняю команду…";
         _deadline = DateTime.UtcNow.AddSeconds(30);
         ArtifactPath = null;
-        SourceUrl = null;
         // Consume confirmation before AI routing; any other answer cancels this one-use request.
         if (_powerConfirmation.HasPending)
         {
@@ -694,7 +689,6 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         }
         if (_disposed || session != _session || revision != Ai.ConnectionRevision || token.IsCancellationRequested) return;
         _lastVerified = result.Verified;
-        SourceUrl = result.Verified ? result.SourceUrl : null;
         Reply = localTask || useBrowserTools ? string.Join("\n", result.Message.Split('\n').Select(Ui.Text)) : result.Message;
         Log(Reply);
         if (!_voiceInteraction)

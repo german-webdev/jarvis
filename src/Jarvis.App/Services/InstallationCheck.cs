@@ -37,7 +37,7 @@ public static class InstallationCheck
             if (layout.Installed)
             {
                 using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-                await using var browser = await PlaywrightBrowserTools.StartAsync(layout.UserRoot, null, deadline.Token, headless: true);
+                await using var browser = await PlaywrightBrowserTools.StartAsync(layout.UserRoot, null, deadline.Token);
                 browserTools = browser.Tools.Count;
             }
             result = new { success = true, ready = true, speechBytes = bytes, browserTools, assets = layout.Assets, runtime = typeof(object).Assembly.Location };

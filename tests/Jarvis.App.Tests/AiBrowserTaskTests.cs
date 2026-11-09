@@ -14,6 +14,7 @@ public sealed class AiBrowserTaskTests
 {
     private const string Prompt = "Открой YouTube и найди видео про котиков";
     private const string Url = "https://www.youtube.com/results?search_query=cats";
+    private const string Watch = "https://www.youtube.com/watch?v=abcdefghijk";
 
     [Theory]
     [InlineData(true)]
@@ -39,12 +40,80 @@ public sealed class AiBrowserTaskTests
         })));
         Configure(ai, root.Path);
         ai.OpenBrowserTools = (_, _) => Task.FromResult<IAiToolSession>(browser);
+        List<string> opened = [];
+        ai.OpenBrowserPage = (address, _) =>
+        {
+            Assert.True(browser.Disposed);
+            Assert.Equal(2, requests);
+            opened.Add(address.AbsoluteUri);
+        };
         var result = await ai.RunBrowserRequestAsync(Prompt, true, null, CancellationToken.None);
         Assert.Equal(verified, result.Verified);
         Assert.Equal(verified ? Url : null, result.SourceUrl);
-        Assert.Equal(verified ? "observed title" : "connection error", result.Message);
+        Assert.Equal(verified ? "Выполнено." : "connection error", result.Message);
+        Assert.Equal(verified ? new[] { Url } : Array.Empty<string>(), opened);
         Assert.True(browser.Disposed);
         Assert.Equal(1, browser.Calls);
+    }
+
+    [Fact]
+    public async Task OnlyTheFinalVerifiedWatchPageOpensForAVideoRequest()
+    {
+        using var root = new TestProfile();
+        var browser = new Browser(true);
+        var requests = 0;
+        using var ai = new AiService(root.Path, new HttpClient(new Handler(_ => Task.FromResult(++requests switch
+        {
+            1 => Call(),
+            2 => Call(Watch, "watch_fixture"),
+            _ => AiLocalActionServiceTests.TextAnswer()
+        }))));
+        Configure(ai, root.Path);
+        ai.OpenBrowserTools = (_, _) => Task.FromResult<IAiToolSession>(browser);
+        List<string> opened = [];
+        ai.OpenBrowserPage = (address, _) => opened.Add(address.AbsoluteUri);
+        var result = await ai.RunBrowserRequestAsync("Запусти видео про кошек на YouTube", true, null, CancellationToken.None);
+        Assert.True(result.Verified);
+        Assert.Equal("Выполнено.", result.Message);
+        Assert.Equal(new[] { Watch }, opened);
+        Assert.Equal(2, browser.Calls);
+    }
+
+    [Fact]
+    public async Task FailedDefaultBrowserHandoffDoesNotClaimCompletion()
+    {
+        using var root = new TestProfile();
+        var requests = 0;
+        using var ai = new AiService(root.Path, new HttpClient(new Handler(_ =>
+            Task.FromResult(++requests == 1 ? Call() : AiLocalActionServiceTests.TextAnswer()))));
+        Configure(ai, root.Path);
+        ai.OpenBrowserTools = (_, _) => Task.FromResult<IAiToolSession>(new Browser(true));
+        ai.OpenBrowserPage = (_, _) => throw new System.ComponentModel.Win32Exception();
+        var result = await ai.RunBrowserRequestAsync(Prompt, true, null, CancellationToken.None);
+        Assert.False(result.Verified);
+        Assert.Contains("браузере по умолчанию", result.Message);
+    }
+
+    [Fact]
+    public async Task StoppingAfterObservationRejectsTheLateBrowserHandoff()
+    {
+        using var root = new TestProfile();
+        using var stop = new CancellationTokenSource();
+        var pendingAnswer = new TaskCompletionSource<HttpResponseMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var browser = new Browser(true);
+        var requests = 0;
+        using var ai = new AiService(root.Path, new HttpClient(new Handler(_ => ++requests == 1 ? Task.FromResult(Call()) : pendingAnswer.Task)));
+        Configure(ai, root.Path);
+        ai.OpenBrowserTools = (_, _) => Task.FromResult<IAiToolSession>(browser);
+        var opens = 0;
+        ai.OpenBrowserPage = (_, _) => opens++;
+        var pending = ai.RunBrowserRequestAsync(Prompt, true, null, stop.Token);
+        Assert.Equal(1, browser.Calls);
+        stop.Cancel();
+        pendingAnswer.SetResult(AiLocalActionServiceTests.TextAnswer());
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending.WaitAsync(TimeSpan.FromSeconds(2)));
+        await browser.Closed.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.Equal(0, opens);
     }
 
     [Theory]
@@ -165,7 +234,19 @@ public sealed class AiBrowserTaskTests
               - /url: /watch?v=abcdefghijk
             """);
         Assert.True(result.Verified);
-        Assert.Contains("The \"Cat\" video", result.Display);
+        using var data = JsonDocument.Parse(result.Data);
+        Assert.Equal("The \"Cat\" video", data.RootElement.GetProperty("videos")[0].GetProperty("title").GetString());
+    }
+
+    [Theory]
+    [InlineData(Watch, "Cat video", true)]
+    [InlineData(Watch, "Video unavailable", false)]
+    [InlineData("https://www.youtube.com/watch?v=ABCDEFGHIJK", "Cat video", false)]
+    public void WatchPageRequiresTheRequestedIdAndVideoHeading(string address, string heading, bool verified)
+    {
+        var result = PlaywrightBrowserTools.Observe(new Uri(Watch),
+            $"### Page\n- Page URL: {address}\n- Page Title: Cat video - YouTube\n### Snapshot\n- heading \"{heading}\" [level=1] [ref=e1]");
+        Assert.Equal(verified, result.Verified);
     }
 
     private static void Configure(AiService ai, string root)
@@ -174,10 +255,10 @@ public sealed class AiBrowserTaskTests
         ai.Save(ai.Configuration with { AllowLocalActions = false, UseForUnknownCommands = true });
     }
 
-    private static HttpResponseMessage Call() => new(HttpStatusCode.OK) { Content = new StringContent("data: " + JsonSerializer.Serialize(new
+    private static HttpResponseMessage Call(string url = Url, string id = "call_fixture") => new(HttpStatusCode.OK) { Content = new StringContent("data: " + JsonSerializer.Serialize(new
     {
         type = "response.completed", response = new { status = "completed", output = new[] { new { type = "function_call", @namespace = "jarvis_tools",
-            name = "browser_navigate", call_id = "call_fixture", arguments = JsonSerializer.Serialize(new { url = Url }), status = "completed" } } }
+            name = "browser_navigate", call_id = id, arguments = JsonSerializer.Serialize(new { url }), status = "completed" } } }
     }) + "\n\n") };
 
     private sealed class TestProfile : IDisposable
@@ -200,9 +281,10 @@ public sealed class AiBrowserTaskTests
         public Task<AiToolObservation> InvokeAsync(string name, JsonElement arguments, CancellationToken token)
         {
             Assert.Equal("browser_navigate", name);
-            Assert.Equal(Url, arguments.GetProperty("url").GetString());
+            var address = arguments.GetProperty("url").GetString();
+            Assert.True(address is Url or Watch);
             Calls++;
-            return Task.FromResult(new AiToolObservation(verified, "observed page data", verified ? "observed title" : "connection error", verified ? Url : null));
+            return Task.FromResult(new AiToolObservation(verified, "observed page data", verified ? "observed title" : "connection error", verified ? address : null));
         }
         public ValueTask DisposeAsync() { Closed.TrySetResult(); return ValueTask.CompletedTask; }
     }

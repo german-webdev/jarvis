@@ -112,7 +112,7 @@ public sealed class McpStdioClient : IAsyncDisposable
         {
             if (_position == _available)
             {
-                _available = await _process.StandardOutput.ReadAsync(_buffer, token).ConfigureAwait(false);
+                _available = await _process.StandardOutput.ReadAsync(_buffer, token).AsTask().WaitAsync(token).ConfigureAwait(false);
                 _position = 0;
                 if (_available == 0) throw new EndOfStreamException("MCP session closed.");
             }

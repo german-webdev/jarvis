@@ -173,6 +173,12 @@ public partial class MainWindow : Window
         try { using var process = Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); }
         catch (Exception ex) { MessageBox.Show(this, ex.Message, Ui.Text("Не удалось открыть снимок")); }
     }
+    private void SourceClick(object sender, RoutedEventArgs e)
+    {
+        if (!PlaywrightBrowserTools.TryPublicPage(_viewModel.SourceUrl, out var uri)) return;
+        try { using var process = Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true }); }
+        catch (Exception) { MessageBox.Show(this, Ui.Text("Не удалось открыть страницу.")); }
+    }
     private void OpenSettings()
     {
         ShowFromTray();

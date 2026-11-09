@@ -37,7 +37,10 @@ public sealed partial class ChatGptPlanClient
         return await ReadActionTurnAsync(stream, token);
     }
 
-    public static async Task<AiActionTurn> ReadActionTurnAsync(Stream stream, CancellationToken token)
+    public static Task<AiActionTurn> ReadActionTurnAsync(Stream stream, CancellationToken token) =>
+        ReadToolTurnAsync(stream, "jarvis_local", token);
+
+    private static async Task<AiActionTurn> ReadToolTurnAsync(Stream stream, string toolNamespace, CancellationToken token)
     {
         using var reader = new StreamReader(stream, Encoding.UTF8, leaveOpen: true);
         var data = new StringBuilder(); var line = new StringBuilder(); var ch = new char[1]; var total = 0;
@@ -70,7 +73,7 @@ public sealed partial class ChatGptPlanClient
                 switch (item.GetProperty("type").GetString())
                 {
                     case "function_call":
-                        if (!item.TryGetProperty("namespace", out var ns) || ns.GetString() != "jarvis_local")
+                        if (!item.TryGetProperty("namespace", out var ns) || ns.GetString() != toolNamespace)
                             throw new InvalidDataException("Это действие не разрешено. Задача остановлена.");
                         if (item.TryGetProperty("status", out var status) && status.GetString() != "completed")
                             throw new InvalidDataException("ChatGPT не завершил задачу. Действия остановлены.");

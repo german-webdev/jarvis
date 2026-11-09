@@ -1,6 +1,9 @@
 namespace Jarvis.Core;
 
-public record SkillResult(bool Verified, string Message, string? ArtifactPath = null, bool Silent = false);
+public record SkillResult(bool Verified, string Message, string? ArtifactPath = null, bool Silent = false)
+{
+    public string? SourceUrl { get; init; }
+}
 public interface ISkill
 {
     bool Handles(Intent intent);

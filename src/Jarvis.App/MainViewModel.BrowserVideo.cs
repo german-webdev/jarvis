@@ -69,6 +69,7 @@ public sealed partial class MainViewModel
         var revision = Ai.ConnectionRevision;
         bool Current() => !_disposed && session == _session && revision == Ai.ConnectionRevision && !token.IsCancellationRequested;
         _aiResponseSession = session;
+        SourceUrl = null;
         _askingChoice = false; VideoResults.Clear(); SetBrowserPending(true);
         Phase = AssistantPhase.Executing; _deadline = DateTime.UtcNow.AddSeconds(40);
         BrowserStatus = Status = query != null ? "Ищу видео в управляемом браузере…" : "Открываю выбранное видео…";
@@ -107,7 +108,8 @@ public sealed partial class MainViewModel
     private async Task<bool> TryBrowserCommandAsync(string text, long session, CancellationToken token)
     {
         if (_conversation.HasPending) return false;
-        var query = BrowserVideoCommands.Query(text);
+        var query = Ai.Configuration.UseForUnknownCommands && Ai.Configuration.Active?.SupportsBrowserTools == true
+            ? null : BrowserVideoCommands.Query(text);
         if (query != null) { await RunBrowserVideoAsync(query, null, session, token); return true; }
         if (VideoResults.Count == 0) return false;
         if (BrowserVideoCommands.Choice(text) is { } index)

@@ -43,9 +43,12 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     public event Action<string>? ClarificationReady;
     private List<LaunchTarget> _targets = [];
     private string? _artifactPath;
+    private string? _sourceUrl;
     public IReadOnlyList<LaunchTarget> Targets => _targets;
     public string? ArtifactPath { get => _artifactPath; private set { SetProperty(ref _artifactPath, value); OnPropertyChanged(nameof(HasArtifact)); } }
     public bool HasArtifact => ArtifactPath != null;
+    public string? SourceUrl { get => _sourceUrl; private set { SetProperty(ref _sourceUrl, value); OnPropertyChanged(nameof(HasSourceUrl)); } }
+    public bool HasSourceUrl => SourceUrl != null;
     private AssistantSettings _settings = new();
     private AssistantPhase _phase = AssistantPhase.Loading;
     private bool _microphoneActive;
@@ -284,6 +287,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     private void StopTask()
     {
         Stop();
+        SourceUrl = null;
         Reply = Ui.Text("Задача остановлена. Уже выполненные действия не отменены.");
     }
 
@@ -557,6 +561,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         Phase = AssistantPhase.Executing; Status = "Выполняю команду…";
         _deadline = DateTime.UtcNow.AddSeconds(30);
         ArtifactPath = null;
+        SourceUrl = null;
         // Consume confirmation before AI routing; any other answer cancels this one-use request.
         if (_powerConfirmation.HasPending)
         {
@@ -624,9 +629,10 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
             _deadline = DateTime.UtcNow.AddSeconds(30); Speak(session, Reply, Settings); return;
         }
         _askingChoice = false;
-        if (AiRouting.CanFallback(Ai.Configuration, turn.Command!, wasChoosing))
+        var needsBrowser = !wasChoosing && turn.Command!.Intent == Intent.Unknown && AiRouting.NeedsBrowser(text);
+        if (needsBrowser || AiRouting.CanFallback(Ai.Configuration, turn.Command!, wasChoosing))
         {
-            await AnswerWithAiAsync(text, session, token);
+            await AnswerWithAiAsync(text, session, token, useBrowserTools: true, needsBrowser: needsBrowser);
             return;
         }
         var result = await _skills.ExecuteAsync(turn.Command!, token);
@@ -644,7 +650,8 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         _deadline = DateTime.UtcNow.AddSeconds(30); Speak(session, Reply, Settings);
     }
 
-    private async Task AnswerWithAiAsync(string question, long session, CancellationToken token, bool localTask = false)
+    private async Task AnswerWithAiAsync(string question, long session, CancellationToken token, bool localTask = false,
+        bool useBrowserTools = false, bool needsBrowser = false)
     {
         Status = "Жду ответ нейросети…";
         _deadline = DateTime.UtcNow.AddSeconds(120);
@@ -669,6 +676,15 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
                     if (step.Verified != null) Reply = Ui.Text(step.Message);
                 }, token);
             }
+            else if (useBrowserTools)
+            {
+                if (Ai.Configuration.Active?.SupportsBrowserTools == true && Ai.Configuration.UseForUnknownCommands)
+                    interrupt = BeginTaskVoiceInterrupt(session);
+                result = await Ai.RunBrowserRequestAsync(question, needsBrowser, status =>
+                {
+                    if (!_disposed && session == _session && revision == Ai.ConnectionRevision && !token.IsCancellationRequested) Status = status;
+                }, token);
+            }
             else result = await Ai.AskAsync(question, token);
         }
         finally
@@ -678,12 +694,13 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         }
         if (_disposed || session != _session || revision != Ai.ConnectionRevision || token.IsCancellationRequested) return;
         _lastVerified = result.Verified;
-        Reply = localTask ? string.Join("\n", result.Message.Split('\n').Select(Ui.Text)) : result.Message;
+        SourceUrl = result.Verified ? result.SourceUrl : null;
+        Reply = localTask || useBrowserTools ? string.Join("\n", result.Message.Split('\n').Select(Ui.Text)) : result.Message;
         Log(Reply);
         if (!_voiceInteraction)
         {
             Busy = false; _deadline = DateTime.MaxValue; Phase = AssistantPhase.Idle;
-            Status = "Готов. Ответ показан на экране.";
+            Status = useBrowserTools && !result.Verified ? "Задача не выполнена" : "Готов. Ответ показан на экране.";
             CycleCompleted?.Invoke(result.Verified);
             return;
         }

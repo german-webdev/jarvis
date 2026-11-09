@@ -65,10 +65,21 @@ public class AiTests
         Assert.False(AiRouting.CanFallback(config with { Enabled = false }, new(Intent.Unknown), false));
         Assert.False(AiRouting.CanFallback(config with { UseForUnknownCommands = false }, new(Intent.Unknown), false));
         Assert.False(AiRouting.CanFallback(config, new(Intent.Unknown), true));
-        Assert.False(AiRouting.CanFallback(config, new(Intent.Unknown, CandidateIntent: Intent.LaunchTarget), false));
+        Assert.True(AiRouting.CanFallback(config, new(Intent.Unknown, CandidateIntent: Intent.LaunchTarget), false));
+        Assert.False(AiRouting.CanFallback(config, new(Intent.Unknown, CandidateIntent: Intent.LaunchTarget, CandidateIds: ["a", "b"]), false));
         Assert.False(AiRouting.CanFallback(config, new(Intent.Unknown, Explanation: "choice expired"), false));
         Assert.False(AiRouting.CanFallback(config, CommandRouter.Resolve("открой браузер"), false));
         Assert.False(AiRouting.CanFallback(config, CommandRouter.Resolve("стоп"), false));
+    }
+
+    [Theory]
+    [InlineData("Открой YouTube и найди видео про котиков", true)]
+    [InlineData("Поищи на YouTube смешные ролики с кошками", true)]
+    [InlineData("Что такое браузер?", false)]
+    public void BrowserRequestHintDoesNotReplaceTheCommandRouter(string text, bool expected)
+    {
+        Assert.Equal(expected, AiRouting.NeedsBrowser(text));
+        Assert.Equal(Intent.Unknown, CommandRouter.Resolve(text, [new("youtube", "YouTube", "url", "https://www.youtube.com/", "", [], true)]).Intent);
     }
 
     [Theory]

@@ -9,8 +9,10 @@ namespace Jarvis.App.Services;
 public sealed class AiService : IDisposable
 {
     private readonly HttpClient _http;
+    internal Func<Action<string>?, CancellationToken, Task<IAiToolSession>> OpenBrowserTools { get; set; }
     private readonly object _gate = new();
     private CancellationTokenSource? _pending;
+    private bool _browserToolsPending;
     private long _revision;
     public long ConnectionRevision => Interlocked.Read(ref _revision);
     public event Action? ConnectionChanged;
@@ -23,6 +25,7 @@ public sealed class AiService : IDisposable
 
     public AiService(string root, HttpClient? http = null)
     {
+        OpenBrowserTools = (progress, token) => PlaywrightBrowserTools.StartAsync(root, progress, token);
         _http = http ?? new(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(100) };
         Store = new(Path.Combine(root, "data", "ai-connections.json"));
         (Configuration, LoadWarning) = Store.Load();
@@ -53,7 +56,8 @@ public sealed class AiService : IDisposable
         lock (_gate)
         {
             var changed = ConnectionScope(Configuration.Active) != ConnectionScope(settings.Active)
-                || Configuration.AllowLocalActions != settings.AllowLocalActions;
+                || Configuration.AllowLocalActions != settings.AllowLocalActions
+                || (_browserToolsPending && Configuration.UseForUnknownCommands != settings.UseForUnknownCommands);
             Store.Save(settings); Configuration = settings;
             if (changed) InvalidateConnection();
         }
@@ -77,12 +81,16 @@ public sealed class AiService : IDisposable
     public Task<SkillResult> RunTaskAsync(string question, LocalActionExecutor executor, Action<LocalActionProgress>? progress, CancellationToken token) =>
         AskCoreAsync(question, executor, progress, token);
 
-    private async Task<SkillResult> AskCoreAsync(string question, LocalActionExecutor? executor, Action<LocalActionProgress>? progress, CancellationToken token)
+    public Task<SkillResult> RunBrowserRequestAsync(string question, bool needsObservation, Action<string>? progress, CancellationToken token) =>
+        AskCoreAsync(question, null, null, token, useBrowserTools: true, needsObservation, progress);
+
+    private async Task<SkillResult> AskCoreAsync(string question, LocalActionExecutor? executor, Action<LocalActionProgress>? progress, CancellationToken token,
+        bool useBrowserTools = false, bool needsObservation = false, Action<string>? browserProgress = null)
     {
         var revisionAtStart = ConnectionRevision;
-        Task<string> request;
+        Task<SkillResult> request;
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
-        timeout.CancelAfter(executor == null ? TimeSpan.FromSeconds(110) : AiLocalActions.TimeLimit);
+        timeout.CancelAfter(useBrowserTools ? TimeSpan.FromSeconds(100) : executor == null ? TimeSpan.FromSeconds(110) : AiLocalActions.TimeLimit);
         try
         {
             lock (_gate)
@@ -90,6 +98,10 @@ public sealed class AiService : IDisposable
                 revisionAtStart = ConnectionRevision;
                 var selected = Configuration.Active;
                 if (selected == null) return new(false, "Нейросеть выключена. Добавь и включи подключение в меню «JARVIS → Нейросети».");
+                if (needsObservation && !Configuration.UseForUnknownCommands)
+                    return new(false, "Разреши нейросети обрабатывать неизвестные команды в меню «JARVIS → Нейросети».");
+                if (needsObservation && !selected.SupportsBrowserTools)
+                    return new(false, "Это подключение отвечает на вопросы, но пока не умеет работать с браузером. Выбери ChatGPT.");
                 if (executor != null && !Configuration.AllowLocalActions) return new(false, "Действия ИИ выключены. Разреши их в настройках подключений ИИ.");
                 if (executor != null && selected.Provider != "chatgpt") return new(false, "Это подключение поддерживает разговор, но не локальные действия. Для задач выбери ChatGPT.");
                 var account = selected.Provider == "chatgpt" ? ChatGpt.Read(selected) : null;
@@ -97,8 +109,9 @@ public sealed class AiService : IDisposable
                 AiRequest.ValidateInput(messages);
                 _pending?.Cancel();
                 _pending = timeout;
+                _browserToolsPending = useBrowserTools;
                 request = SendAsync();
-                async Task<string> SendAsync()
+                async Task<SkillResult> SendAsync()
                 {
                     var cancellation = timeout.Token;
                     if (selected.Provider == "chatgpt")
@@ -116,26 +129,39 @@ public sealed class AiService : IDisposable
                             }
                         }
                         if (executor != null)
-                            return await AiLocalActions.RunAsync(messages, executor,
-                                (turn, stop) => ChatGptClient.ActionTurnAsync(ready, selected.Model, turn, stop), progress, cancellation);
-                        return await ChatGptClient.AskAsync(ready, selected.Model, messages, cancellation);
+                            return new(true, await AiLocalActions.RunAsync(messages, executor,
+                                (turn, stop) => ChatGptClient.ActionTurnAsync(ready, selected.Model, turn, stop), progress, cancellation));
+                        if (useBrowserTools && Configuration.UseForUnknownCommands && selected.SupportsBrowserTools)
+                        {
+                            IAiToolSession? browser = null;
+                            try { browser = await OpenBrowserTools(browserProgress, cancellation); }
+                            catch (InvalidDataException) when (!needsObservation) { }
+                            if (browser != null)
+                            {
+                                await using var session = browser;
+                                return await AiToolTask.RunAsync(session, needsObservation,
+                                    (context, stop) => ChatGptClient.ToolTurnAsync(ready, selected.Model, messages, session.Tools, context, stop), cancellation);
+                            }
+                        }
+                        return new(true, await ChatGptClient.AskAsync(ready, selected.Model, messages, cancellation));
                     }
-                    return selected.IsSubscription
+                    return new(true, selected.IsSubscription
                         ? await Subscriptions.AskAsync(selected, messages, cancellation)
-                        : await new HttpAiClient(_http).AskAsync(selected, Unprotect(selected.ProtectedApiKey), messages, cancellation);
+                        : await new HttpAiClient(_http).AskAsync(selected, Unprotect(selected.ProtectedApiKey), messages, cancellation));
                 }
             }
-            var answer = HttpAiClient.CleanAnswer(await request.WaitAsync(timeout.Token));
+            var result = await request.WaitAsync(timeout.Token);
             timeout.Token.ThrowIfCancellationRequested();
             if (revisionAtStart != ConnectionRevision) throw new OperationCanceledException();
-            return new(true, answer);
+            return result with { Message = HttpAiClient.CleanAnswer(result.Message) };
         }
         catch (Exception) when (token.IsCancellationRequested || revisionAtStart != ConnectionRevision)
         { throw new OperationCanceledException(token); }
-        catch (OperationCanceledException) { return new(false, "Нейросеть не ответила вовремя. Попробуй позже или выбери другую модель."); }
+        catch (OperationCanceledException) { return new(false, useBrowserTools ? "Время браузерной задачи истекло. Попробуй ещё раз."
+            : "Нейросеть не ответила вовремя. Попробуй позже или выбери другую модель."); }
         catch (InvalidDataException error) { return new(false, error.Message); }
         catch (Exception) { return new(false, "Подключение к нейросети не удалось. Проверь его в меню «JARVIS → Нейросети»."); }
-        finally { lock (_gate) { if (_pending == timeout) _pending = null; } }
+        finally { lock (_gate) { if (_pending == timeout) { _pending = null; _browserToolsPending = false; } } }
     }
 
     public static string Protect(string key) => string.IsNullOrEmpty(key) ? "" :

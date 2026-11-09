@@ -14,6 +14,8 @@ public sealed record AiConnection
     public string ProtectedApiKey { get; init; } = "";
     [System.Text.Json.Serialization.JsonIgnore]
     public bool IsSubscription => Provider is "chatgpt" or "claude";
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool SupportsBrowserTools => Provider == "chatgpt";
 
     public void Validate()
     {
@@ -97,5 +99,13 @@ public static class AiRouting
 
     public static bool CanFallback(AiConfiguration settings, CommandRequest command, bool wasChoosing) =>
         settings.Active != null && settings.UseForUnknownCommands && !wasChoosing && command.Intent == Intent.Unknown
-        && command.CandidateIntent == null && command.CandidateIds == null && command.Explanation == null;
+        && command.CandidateIds == null && (command.Explanation == null || command.CandidateIntent == Intent.LaunchTarget);
+
+    // This only chooses an availability/verification message. The model receives the entire request and chooses the action.
+    public static bool NeedsBrowser(string text)
+    {
+        var phrase = CommandRouter.Normalize(text);
+        return Regex.IsMatch(phrase, @"\b(?:найди|поищи|отыщи|подбери|найти|покажи|открой|открыть|прочитай|посмотри|find|search|open|read)\b")
+            && Regex.IsMatch(phrase, @"\b(?:youtube|ютуб\w*|википеди\w*|wikipedia|интернет\w*|онлайн|сайт\w*|браузер\w*|web|website|browser|видео|ролик\w*|videos?)\b");
+    }
 }

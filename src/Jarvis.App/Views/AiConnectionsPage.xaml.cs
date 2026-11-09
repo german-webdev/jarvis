@@ -25,6 +25,7 @@ public partial class AiConnectionsPage : WorkspacePage
         ConnectionsList.ItemsSource = _connections; ActiveBox.ItemsSource = _connections;
         ActiveBox.SelectedValue = service.Configuration.ActiveConnectionId;
         EnabledBox.IsChecked = service.Configuration.Enabled; FallbackBox.IsChecked = service.Configuration.UseForUnknownCommands;
+        FallbackBox.ToolTip = Ui.Text("С ChatGPT это также включает поиск YouTube через браузер.");
         ActionsBox.IsChecked = service.Configuration.AllowLocalActions;
         ActionsBox.Content = Ui.Text("Разрешить локальные задачи ИИ (ChatGPT)");
         ActionsBox.ToolTip = Ui.Text("«Задача ИИ: открой [приложение], затем переключись на него». Только включённые EXE из каталога. До трёх действий.");

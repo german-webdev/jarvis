@@ -29,7 +29,7 @@
             Background="Transparent" Visibility="Collapsed"/>
     <Border x:Name="RobotSurface" Width="180" Height="200" VerticalAlignment="Bottom" Margin="0,0,0,64" Focusable="True"
             RenderTransformOrigin="0.5,0.97" UseLayoutRounding="False"
-            AutomationProperties.Name="{Binding PhaseTitle}" AutomationProperties.HelpText="{Binding MicrophoneLabel}">
+            ToolTip="{Binding Status}" AutomationProperties.Name="{Binding PhaseTitle}" AutomationProperties.HelpText="{Binding MicrophoneLabel}">
       <Border.RenderTransform><ScaleTransform x:Name="RobotScale"/></Border.RenderTransform>
       <Viewbox Stretch="Uniform">
         <controls:MiniRobot x:Name="Robot" Phase="{Binding Phase}" MicrophoneActive="{Binding MicrophoneActive}" CanStop="{Binding CanStop}" ReduceMotion="{Binding ReduceMotion}"/>

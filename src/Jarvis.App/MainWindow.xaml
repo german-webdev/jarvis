@@ -118,6 +118,7 @@
               <TextBlock x:Name="ReplyText" Text="{Binding Reply, NotifyOnTargetUpdated=True}" TargetUpdated="MessageTextUpdated" TextWrapping="Wrap" FontSize="14"/>
             </ScrollViewer>
             <Button Grid.Row="2" Content="{DynamicResource Ui406FB42FCBCB}" Click="ArtifactClick" HorizontalAlignment="Left" Margin="0,10,0,0" Padding="10,5" Visibility="{Binding HasArtifact, Converter={StaticResource BoolVisibility}}"/>
+            <Button Grid.Row="2" Content="{DynamicResource Ui6EE247BF8669}" Click="SourceClick" HorizontalAlignment="Left" Margin="0,10,0,0" Padding="10,5" Visibility="{Binding HasSourceUrl, Converter={StaticResource BoolVisibility}}"/>
           </Grid>
         </Border>
       </Grid>

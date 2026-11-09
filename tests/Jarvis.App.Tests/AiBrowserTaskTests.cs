@@ -15,6 +15,7 @@ public sealed class AiBrowserTaskTests
     private const string Prompt = "Открой YouTube и найди видео про котиков";
     private const string Url = "https://www.youtube.com/results?search_query=cats";
     private const string Watch = "https://www.youtube.com/watch?v=abcdefghijk";
+    private const string Channel = "https://www.youtube.com/@FixtureChannel";
 
     [Theory]
     [InlineData(true)]
@@ -36,7 +37,7 @@ public sealed class AiBrowserTaskTests
             using var output = JsonDocument.Parse(input[2].GetProperty("output").GetString()!);
             Assert.Equal(verified, output.RootElement.GetProperty("verified").GetBoolean());
             Assert.Equal("observed page data", output.RootElement.GetProperty("observation").GetString());
-            return AiLocalActionServiceTests.TextAnswer();
+            return verified ? Show() : AiLocalActionServiceTests.TextAnswer();
         })));
         Configure(ai, root.Path);
         ai.OpenBrowserTools = (_, _) => Task.FromResult<IAiToolSession>(browser);
@@ -66,7 +67,7 @@ public sealed class AiBrowserTaskTests
         {
             1 => Call(),
             2 => Call(Watch, "watch_fixture"),
-            _ => AiLocalActionServiceTests.TextAnswer()
+            _ => Show()
         }))));
         Configure(ai, root.Path);
         ai.OpenBrowserTools = (_, _) => Task.FromResult<IAiToolSession>(browser);
@@ -85,7 +86,7 @@ public sealed class AiBrowserTaskTests
         using var root = new TestProfile();
         var requests = 0;
         using var ai = new AiService(root.Path, new HttpClient(new Handler(_ =>
-            Task.FromResult(++requests == 1 ? Call() : AiLocalActionServiceTests.TextAnswer()))));
+            Task.FromResult(++requests == 1 ? Call() : Show()))));
         Configure(ai, root.Path);
         ai.OpenBrowserTools = (_, _) => Task.FromResult<IAiToolSession>(new Browser(true));
         ai.OpenBrowserPage = (_, _) => throw new System.ComponentModel.Win32Exception();
@@ -110,10 +111,50 @@ public sealed class AiBrowserTaskTests
         var pending = ai.RunBrowserRequestAsync(Prompt, true, null, stop.Token);
         Assert.Equal(1, browser.Calls);
         stop.Cancel();
-        pendingAnswer.SetResult(AiLocalActionServiceTests.TextAnswer());
+        pendingAnswer.SetResult(Show());
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending.WaitAsync(TimeSpan.FromSeconds(2)));
         await browser.Closed.Task.WaitAsync(TimeSpan.FromSeconds(2));
         Assert.Equal(0, opens);
+    }
+
+    [Fact]
+    public async Task ResearchAnswerDoesNotOpenATab()
+    {
+        using var root = new TestProfile();
+        var requests = 0;
+        var browser = new Browser(true);
+        using var ai = new AiService(root.Path, new HttpClient(new Handler(_ =>
+            Task.FromResult(++requests == 1 ? Call() : AiLocalActionServiceTests.TextAnswer()))));
+        Configure(ai, root.Path);
+        ai.OpenBrowserTools = (_, _) => Task.FromResult<IAiToolSession>(browser);
+        ai.OpenBrowserPage = (_, _) => throw new Xunit.Sdk.XunitException("Research must not open the browser.");
+        var result = await ai.RunBrowserRequestAsync("Research this topic", false, null, CancellationToken.None);
+        Assert.True(result.Verified);
+        Assert.Equal("done", result.Message);
+        Assert.Null(result.SourceUrl);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ChannelRequestOnlyHandsOffAChannelPage(bool channelFound)
+    {
+        using var root = new TestProfile();
+        var browser = new Browser(true);
+        var requests = 0;
+        using var ai = new AiService(root.Path, new HttpClient(new Handler(_ => Task.FromResult(++requests switch
+        {
+            1 => Call(),
+            2 when channelFound => Call(Channel, "channel_fixture"),
+            _ => Show()
+        }))));
+        Configure(ai, root.Path);
+        ai.OpenBrowserTools = (_, _) => Task.FromResult<IAiToolSession>(browser);
+        List<string> opened = [];
+        ai.OpenBrowserPage = (address, _) => opened.Add(address.AbsoluteUri);
+        var result = await ai.RunBrowserRequestAsync("Открой канал Фикстура", true, null, CancellationToken.None);
+        Assert.Equal(channelFound, result.Verified);
+        Assert.Equal(channelFound ? new[] { Channel } : Array.Empty<string>(), opened);
     }
 
     [Theory]
@@ -202,12 +243,29 @@ public sealed class AiBrowserTaskTests
     [Theory]
     [InlineData("file:///C:/secret.txt")]
     [InlineData("http://127.0.0.1")]
-    [InlineData("https://www.youtube.com.evil.example/results?search_query=cats")]
-    [InlineData("https://www.youtube.com/redirect?q=https://localhost")]
+    [InlineData("https://foo.localhost/results")]
+    [InlineData("https://service.local/results")]
     [InlineData("https://www.youtube.com:444/results?search_query=cats")]
-    [InlineData("https://www.youtube.com/results?search_query=cats&next=https://localhost")]
-    public void BrowserAddressScopeExcludesPrivateAddressesAndUnapprovedPaths(string url) =>
+    [InlineData("https://secret@example.org/results")]
+    public void BrowserAddressScopeExcludesPrivateAddressesAndCredentials(string url) =>
         Assert.False(PlaywrightBrowserTools.TryPublicPage(url, out _));
+
+    [Theory]
+    [InlineData("https://example.net/articles/current?format=compact")]
+    [InlineData("https://www.weather.gov/")]
+    [InlineData("http://example.com/")]
+    public void PublicBrowserHasNoSiteAllowlist(string url) => Assert.True(PlaywrightBrowserTools.TryPublicPage(url, out _));
+
+    [Theory]
+    [InlineData("1.1.1.1", true)]
+    [InlineData("2606:4700::1111", true)]
+    [InlineData("10.0.0.8", false)]
+    [InlineData("127.0.0.1", false)]
+    [InlineData("169.254.169.254", false)]
+    [InlineData("::ffff:192.168.1.1", false)]
+    [InlineData("fc00::1", false)]
+    public void PublicBrowserRejectsPrivateDnsDestinations(string ip, bool expected) =>
+        Assert.Equal(expected, PlaywrightBrowserTools.IsPublicIp(IPAddress.Parse(ip)));
 
     [Theory]
     [InlineData(Url, "/watch?v=abcdefghijk", true)]
@@ -249,6 +307,52 @@ public sealed class AiBrowserTaskTests
         Assert.Equal(verified, result.Verified);
     }
 
+    [Fact]
+    public void YoutubeResultsReturnObservedChannelLinksWithoutRequiringVideos()
+    {
+        var result = PlaywrightBrowserTools.Observe(new Uri(Url), $"""
+            ### Page
+            - Page URL: {Url}
+            - Page Title: cats - YouTube
+            ### Snapshot
+            - link "Fixture channel @FixtureChannel" [ref=e3]:
+              - /url: /@FixtureChannel
+            """);
+        Assert.True(result.Verified);
+        using var data = JsonDocument.Parse(result.Data);
+        Assert.Equal(Channel, data.RootElement.GetProperty("channels")[0].GetProperty("url").GetString());
+    }
+
+    [Theory]
+    [InlineData(Channel, "@FixtureChannel", true)]
+    [InlineData(Channel, "@wrong", false)]
+    [InlineData("https://www.youtube.com/@wrong", "@wrong", false)]
+    public void ChannelRequiresTheExpectedAddressAndObservedHeader(string address, string handle, bool verified)
+    {
+        var result = PlaywrightBrowserTools.Observe(new Uri(Channel), $"""
+            ### Page
+            - Page URL: {address}
+            - Page Title: Fixture - YouTube
+            ### Snapshot
+            - heading "Fixture, verified" [level=1] [ref=e3]:
+              - generic [ref=e4]: Fixture
+              - generic [ref=e5]: "{handle}"
+            """);
+        Assert.Equal(verified, result.Verified);
+    }
+
+    [Fact]
+    public void OptionalCookieRejectionOnlyMatchesTheExpectedChannel()
+    {
+        var redirect = Uri.EscapeDataString(Channel + "?cbrd=1");
+        var snapshot = $"### Page\n- Page URL: https://consent.youtube.com/m?continue={redirect}\n### Snapshot\n- button \"Reject all\" [ref=e14]";
+        Assert.True(PlaywrightBrowserTools.TryGetConsentReject(new Uri(Channel), snapshot, out var target));
+        Assert.Equal("e14", target);
+        Assert.False(PlaywrightBrowserTools.TryGetConsentReject(new Uri(Channel), snapshot.Replace("Reject all", "Accept all"), out _));
+        Assert.False(PlaywrightBrowserTools.TryGetConsentReject(new Uri(Channel), snapshot.Replace("consent.youtube.com", "example.org"), out _));
+        Assert.False(PlaywrightBrowserTools.TryGetConsentReject(new Uri("https://www.youtube.com/@different"), snapshot, out _));
+    }
+
     private static void Configure(AiService ai, string root)
     {
         AiLocalActionServiceTests.Configure(ai, root);
@@ -259,6 +363,12 @@ public sealed class AiBrowserTaskTests
     {
         type = "response.completed", response = new { status = "completed", output = new[] { new { type = "function_call", @namespace = "jarvis_tools",
             name = "browser_navigate", call_id = id, arguments = JsonSerializer.Serialize(new { url }), status = "completed" } } }
+    }) + "\n\n") };
+
+    private static HttpResponseMessage Show() => new(HttpStatusCode.OK) { Content = new StringContent("data: " + JsonSerializer.Serialize(new
+    {
+        type = "response.completed", response = new { status = "completed", output = new[] { new { type = "function_call", @namespace = "jarvis_tools",
+            name = "browser_show", call_id = "show_fixture", arguments = "{}", status = "completed" } } }
     }) + "\n\n") };
 
     private sealed class TestProfile : IDisposable
@@ -274,15 +384,19 @@ public sealed class AiBrowserTaskTests
 
     private sealed class Browser(bool verified) : IAiToolSession
     {
+        private string? _current;
         public int Calls { get; private set; }
         public TaskCompletionSource Closed { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public bool Disposed => Closed.Task.IsCompleted;
-        public IReadOnlyList<AiToolDefinition> Tools { get; } = [new("browser_navigate", "Read a page", JsonSerializer.SerializeToElement(new { type = "object" }))];
+        public IReadOnlyList<AiToolDefinition> Tools { get; } = [new("browser_navigate", "Read a page", JsonSerializer.SerializeToElement(new { type = "object" })),
+            new("browser_show", "Show a page", JsonSerializer.SerializeToElement(new { type = "object" }))];
         public Task<AiToolObservation> InvokeAsync(string name, JsonElement arguments, CancellationToken token)
         {
+            if (name == "browser_show") return Task.FromResult(new AiToolObservation(true, "", "Выполнено.", _current, Complete: true));
             Assert.Equal("browser_navigate", name);
             var address = arguments.GetProperty("url").GetString();
-            Assert.True(address is Url or Watch);
+            Assert.True(address is Url or Watch or Channel);
+            _current = verified ? address : null;
             Calls++;
             return Task.FromResult(new AiToolObservation(verified, "observed page data", verified ? "observed title" : "connection error", verified ? address : null));
         }

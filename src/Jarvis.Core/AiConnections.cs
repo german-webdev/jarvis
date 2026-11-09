@@ -105,7 +105,10 @@ public static class AiRouting
     public static bool NeedsBrowser(string text)
     {
         var phrase = CommandRouter.Normalize(text);
-        return Regex.IsMatch(phrase, @"\b(?:найди|поищи|отыщи|подбери|найти|покажи|открой|открыть|прочитай|посмотри|запусти|запустить|включи|включить|find|search|open|read|play|watch)\b")
+        return RequestsChannelPage(text) || Regex.IsMatch(phrase, @"\b(?:найди|поищи|отыщи|подбери|найти|покажи|открой|открыть|прочитай|посмотри|запусти|запустить|включи|включить|find|search|open|read|play|watch)\b")
             && Regex.IsMatch(phrase, @"\b(?:youtube|ютуб\w*|википеди\w*|wikipedia|интернет\w*|онлайн|сайт\w*|браузер\w*|web|website|browser|видео|ролик\w*|videos?)\b");
     }
+
+    public static bool RequestsChannelPage(string text) => Regex.IsMatch(CommandRouter.Normalize(text),
+        @"\b(?:открой|открыть|покажи|найди|поищи|перейди на|зайди на|open|find|go to) (?:(?:мне|пожалуйста|(?:на )?(?:ютуб\w*|youtube)) )*(?:канал|channel)\b");
 }

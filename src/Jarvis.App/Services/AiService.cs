@@ -88,10 +88,12 @@ public sealed class AiService : IDisposable
     private async Task<SkillResult> AskCoreAsync(string question, LocalActionExecutor? executor, Action<LocalActionProgress>? progress, CancellationToken token,
         bool useBrowserTools = false, bool needsObservation = false, Action<string>? browserProgress = null)
     {
+        var channelRequest = useBrowserTools && AiRouting.RequestsChannelPage(question);
+        needsObservation |= channelRequest;
         var revisionAtStart = ConnectionRevision;
         Task<SkillResult> request;
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
-        timeout.CancelAfter(useBrowserTools ? TimeSpan.FromSeconds(100) : executor == null ? TimeSpan.FromSeconds(110) : AiLocalActions.TimeLimit);
+        timeout.CancelAfter(useBrowserTools ? TimeSpan.FromSeconds(150) : executor == null ? TimeSpan.FromSeconds(110) : AiLocalActions.TimeLimit);
         try
         {
             lock (_gate)
@@ -156,10 +158,14 @@ public sealed class AiService : IDisposable
             {
                 timeout.Token.ThrowIfCancellationRequested();
                 if (revisionAtStart != ConnectionRevision) throw new OperationCanceledException();
+                if (channelRequest && result.Verified && result.SourceUrl == null)
+                    return new(false, "Не удалось подтвердить страницу канала.");
                 if (useBrowserTools && result.Verified && result.SourceUrl is { } source)
                 {
                     if (!PlaywrightBrowserTools.TryPublicPage(source, out var address))
                         return new(false, "Адрес страницы не подтверждён.");
+                    if (channelRequest && address.Host == "www.youtube.com" && !PlaywrightBrowserTools.IsChannelPage(address))
+                        return new(false, "Не удалось подтвердить нужный канал YouTube.");
                     try { OpenBrowserPage(address, timeout.Token); }
                     catch (Exception error) when (error is System.ComponentModel.Win32Exception or InvalidOperationException)
                     { return new(false, "Не удалось открыть страницу в браузере по умолчанию."); }

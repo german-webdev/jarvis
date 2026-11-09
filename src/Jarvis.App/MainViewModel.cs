@@ -649,7 +649,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         bool useBrowserTools = false, bool needsBrowser = false)
     {
         Status = "Жду ответ нейросети…";
-        _deadline = DateTime.UtcNow.AddSeconds(120);
+        _deadline = DateTime.UtcNow.AddSeconds(useBrowserTools ? 165 : 120);
         var revision = Ai.ConnectionRevision;
         SkillResult result;
         _aiPending = true;

@@ -3,7 +3,7 @@ using System.Text.Json;
 namespace Jarvis.Core;
 
 public sealed record AiToolDefinition(string Name, string Description, JsonElement Parameters);
-public sealed record AiToolObservation(bool Verified, string Data, string Display, string? SourceUrl = null);
+public sealed record AiToolObservation(bool Verified, string Data, string Display, string? SourceUrl = null, bool Complete = false);
 public sealed record AiToolExchange(IReadOnlyList<JsonElement> ModelOutput, string CallId, AiToolObservation Observation);
 
 public interface IAiToolSession : IAsyncDisposable
@@ -14,7 +14,7 @@ public interface IAiToolSession : IAsyncDisposable
 
 public static class AiToolTask
 {
-    private const int MaxActions = 4;
+    private const int MaxActions = 12;
 
     public static async Task<SkillResult> RunAsync(IAiToolSession session, bool needsObservation,
         Func<IReadOnlyList<AiToolExchange>, CancellationToken, Task<AiActionTurn>> send, CancellationToken token)
@@ -29,9 +29,8 @@ public static class AiToolTask
             token.ThrowIfCancellationRequested();
             if (turn.Calls.Count == 0)
             {
-                if (observation != null)
-                    return new SkillResult(observation.Verified, observation.Display) { SourceUrl = observation.SourceUrl };
-                if (needsObservation)
+                if (observation is { Verified: false }) return new(false, observation.Display);
+                if (observation == null && needsObservation)
                     return new(false, "Браузерное действие не подтверждено.");
                 return new(true, HttpAiClient.CleanAnswer(turn.Text));
             }
@@ -44,8 +43,10 @@ public static class AiToolTask
             using var arguments = JsonDocument.Parse(call.Arguments);
             observation = await session.InvokeAsync(call.Name, arguments.RootElement, token);
             token.ThrowIfCancellationRequested();
+            if (observation.Complete)
+                return new SkillResult(observation.Verified, observation.Display) { SourceUrl = observation.SourceUrl };
             context.Add(new(turn.Output, call.Id, observation));
-            if (context.Sum(step => step.ModelOutput.Sum(item => item.GetRawText().Length) + step.Observation.Data.Length) > 160_000)
+            if (context.Sum(step => step.ModelOutput.Sum(item => item.GetRawText().Length) + step.Observation.Data.Length) > 220_000)
                 throw new InvalidDataException("Контекст задачи слишком большой. Задача остановлена.");
         }
         throw new InvalidOperationException("Unreachable tool task state.");

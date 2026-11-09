@@ -13,5 +13,7 @@ The desktop application and speech worker communicate through a separate JSON Li
 - Whisper small: MIT, https://github.com/openai/whisper. Converted weights: https://huggingface.co/Systran/faster-whisper-small.
 - Piper Russian Dmitri / Denis voice model cards are in models/piper; their training datasets are marked CC0 by the publisher.
 - Microsoft Visual C++ runtime DLLs: Microsoft redistributable components, licensed separately by Microsoft. https://visualstudio.microsoft.com/license-terms/vs2022-cruntime/.
+- Node.js v22.22.3 win-x64: https://nodejs.org/dist/v22.22.3/. License and third-party notices in `runtime/browser/LICENSE`.
+- Microsoft Playwright MCP 0.0.84 and Playwright: Apache-2.0, https://github.com/microsoft/playwright-mcp. Exact versions, tarballs and hashes are in `runtime/browser/package-lock.json`. Package license and notice files are preserved in `runtime/browser/node_modules`. The tool uses installed Microsoft Edge.
 
 Exact Python dependencies and model revisions are recorded alongside this document. The complete payload has a SHA-256 manifest. Personal settings, API keys, OAuth sessions and developer application/game catalogs are not part of the package.

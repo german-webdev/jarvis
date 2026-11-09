@@ -33,7 +33,14 @@ public static class InstallationCheck
             if (!worker.Send(new { type = "synthesize", session = 1, text = "Подтверждаю", voice = "dmitri", style = "natural", amount = 0.0, rate = 1.0 })) throw new IOException("Worker send failed");
             var bytes = await speech.Task.WaitAsync(TimeSpan.FromSeconds(45));
             if (bytes < 1000) throw new IOException("Empty synthesized audio");
-            result = new { success = true, ready = true, speechBytes = bytes, assets = layout.Assets, runtime = typeof(object).Assembly.Location };
+            var browserTools = 0;
+            if (layout.Installed)
+            {
+                using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+                await using var browser = await PlaywrightBrowserTools.StartAsync(layout.UserRoot, null, deadline.Token, headless: true);
+                browserTools = browser.Tools.Count;
+            }
+            result = new { success = true, ready = true, speechBytes = bytes, browserTools, assets = layout.Assets, runtime = typeof(object).Assembly.Location };
         }
         catch (Exception ex) { code = 1; result = new { success = false, error = ex.Message }; }
         var path = Path.GetFullPath(report);

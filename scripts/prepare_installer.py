@@ -10,21 +10,52 @@ import ssl
 import subprocess
 import sys
 import urllib.request
+import zipfile
 from pathlib import Path
 
 import certifi
 from python_utf8_manifest import enable_utf8
 
 ROOT = Path(__file__).resolve().parents[1]
+VERSION = "0.15.0"
+NODE_RELEASE = "v22.22.3"
+NODE_SHA256 = "6c8d54f635feff4df76c2ca80f45332eb2ff57d25226edce36592e51a177ee33"
 
 
 def download(url, path):
     if not path.exists():
         path.parent.mkdir(parents=True, exist_ok=True)
         part = path.with_name(path.name + ".part")
-        with urllib.request.urlopen(url, timeout=60, context=ssl.create_default_context(cafile=certifi.where())) as response, part.open("wb") as out:
+        trust = ssl.create_default_context()
+        trust.load_verify_locations(cafile=certifi.where())
+        with urllib.request.urlopen(url, timeout=60, context=trust) as response, part.open("wb") as out:
             shutil.copyfileobj(response, out)
         part.replace(path)
+
+
+def prepare_browser(runtime):
+    npm = shutil.which("npm.cmd")
+    if not npm:
+        raise RuntimeError("npm is required on the build machine")
+    archive_name = f"node-{NODE_RELEASE}-win-x64"
+    archive = ROOT / ".tools" / f"{archive_name}.zip"
+    download(f"https://nodejs.org/dist/{NODE_RELEASE}/{archive.name}", archive)
+    with archive.open("rb") as source:
+        if hashlib.file_digest(source, "sha256").hexdigest() != NODE_SHA256:
+            raise ValueError("Node.js archive hash mismatch")
+    runtime.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(archive) as package:
+        for name in ("node.exe", "LICENSE"):
+            with package.open(f"{archive_name}/{name}") as source, (runtime / name).open("wb") as output:
+                shutil.copyfileobj(source, output)
+    for name in ("package.json", "package-lock.json"):
+        shutil.copy2(ROOT / "installer" / "browser" / name, runtime / name)
+    environment = os.environ.copy()
+    environment["npm_config_cache"] = str(ROOT / ".tools" / "npm-cache")
+    subprocess.run([npm, "ci", "--ignore-scripts", "--no-audit", "--no-fund", "--no-bin-links",
+                    "--registry=https://registry.npmjs.org/"], cwd=runtime, env=environment, check=True)
+    subprocess.run([str(runtime / "node.exe"), str(runtime / "node_modules" / "@playwright" / "mcp" / "cli.js"), "--version"],
+                   cwd=runtime, check=True)
 
 
 def main():
@@ -36,6 +67,7 @@ def main():
         raise ValueError("Publish the app into an artifacts payload first")
     if (payload / "data").exists() or (payload / "jarvis.install.json").exists():
         raise ValueError("Use a fresh payload; private data and reused packages are forbidden")
+    prepare_browser(payload / "runtime" / "browser")
     runtime = payload / "runtime" / "python"
     base = Path(sys.base_prefix)
     # UV's relocatable CPython distribution, with its license. No venv, registry or user Python needed.
@@ -105,7 +137,7 @@ def main():
     download("https://raw.githubusercontent.com/snakers4/silero-vad/066409f3d9db45a30d21dfcbf9147826ffdd7052/LICENSE", payload / "third-party" / "silero-LICENSE.txt")
     shutil.copy2(ROOT / "scripts" / "python_utf8_manifest.py", sources / "python_utf8_manifest.py")
     shutil.copy2(ROOT / "installer" / "THIRD-PARTY.md", payload / "third-party" / "README.md")
-    (payload / "jarvis.install.json").write_text(json.dumps({"version": "0.14.1", "architecture": "win-x64"}), encoding="utf-8")
+    (payload / "jarvis.install.json").write_text(json.dumps({"version": VERSION, "architecture": "win-x64"}), encoding="utf-8")
     hashes = {}
     for path in payload.rglob("*"):
         if path.is_file():

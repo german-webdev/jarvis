@@ -11,6 +11,8 @@ namespace Jarvis.App.Services;
 /// <summary>Official CLI bridges. Each saved profile owns its own login directory.</summary>
 public sealed class SubscriptionClient(string sessionRoot)
 {
+    public event Action<AiConnection>? AccountChanging;
+
     public static string? FindExecutable(string provider)
     {
         var name = provider == "chatgpt" ? "codex.exe" : "claude.exe";
@@ -69,15 +71,19 @@ public sealed class SubscriptionClient(string sessionRoot)
 
     public async Task SignInAsync(AiConnection connection, CancellationToken token, Action<Uri>? browserLink = null)
     {
+        AccountChanging?.Invoke(connection);
         var result = await RunAsync(CreateStart(connection, connection.Provider == "chatgpt" ? ["login"] : ["auth", "login"]), null, token, browserLink);
         if (result.Code != 0 || !await IsSignedInAsync(connection, token))
             throw new InvalidDataException("Вход по подписке не завершён. Проверь вход в браузере и доступность официального клиента.");
+        AccountChanging?.Invoke(connection);
     }
 
     public async Task SignOutAsync(AiConnection connection, CancellationToken token)
     {
+        AccountChanging?.Invoke(connection);
         var result = await RunAsync(CreateStart(connection, connection.Provider == "chatgpt" ? ["logout"] : ["auth", "logout"]), null, token);
         if (result.Code != 0) throw new InvalidDataException("Не удалось выйти из аккаунта этого подключения.");
+        AccountChanging?.Invoke(connection);
     }
 
     public static string[] AnswerArguments(AiConnection connection)
@@ -99,11 +105,20 @@ public sealed class SubscriptionClient(string sessionRoot)
         return args.ToArray();
     }
 
-    public async Task<string> AskAsync(AiConnection connection, string question, CancellationToken token)
+    public Task<string> AskAsync(AiConnection connection, string question, CancellationToken token) =>
+        AskAsync(connection, new AiMessage[] { new("user", question) }, token);
+
+    public static string RequestInput(IReadOnlyList<AiMessage> messages)
     {
-        if (question.Length is 0 or > 4000) throw new InvalidDataException("Вопрос должен содержать от 1 до 4000 символов.");
+        AiRequest.ValidateInput(messages);
+        return messages[0].Content;
+    }
+
+    public async Task<string> AskAsync(AiConnection connection, IReadOnlyList<AiMessage> conversation, CancellationToken token)
+    {
+        var input = RequestInput(conversation);
         if (!await IsSignedInAsync(connection, token)) throw new InvalidDataException("Сначала выполни вход по подписке в настройках этого подключения.");
-        var result = await RunAsync(CreateStart(connection, AnswerArguments(connection)), question, token);
+        var result = await RunAsync(CreateStart(connection, AnswerArguments(connection)), input, token);
         if (result.Code != 0) throw new InvalidDataException("Официальный клиент не вернул ответ. Проверь вход, лимиты подписки и выбранную модель.");
         return ReadAnswer(connection.Provider, result.Output);
     }

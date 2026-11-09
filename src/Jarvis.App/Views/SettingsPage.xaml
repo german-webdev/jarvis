@@ -1,0 +1,73 @@
+<local:WorkspacePage xmlns:local="clr-namespace:Jarvis.App" x:Class="Jarvis.App.SettingsPage" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Background="{DynamicResource ThemeWindow}" Foreground="{DynamicResource ThemeText}" FontFamily="Segoe UI" FontSize="14">
+  <local:WorkspacePage.Resources>
+    <Style x:Key="Label" TargetType="TextBlock"><Setter Property="Foreground" Value="{DynamicResource ThemeText}"/><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="Margin" Value="0,18,0,8"/></Style>
+    <Style x:Key="Hint" TargetType="TextBlock"><Setter Property="Foreground" Value="{DynamicResource ThemeMuted}"/><Setter Property="TextWrapping" Value="Wrap"/><Setter Property="FontSize" Value="12"/><Setter Property="Margin" Value="0,8,0,0"/></Style>
+    <DataTemplate x:Key="ChoiceTemplate"><TextBlock Text="{Binding Label}" Foreground="{DynamicResource ThemeText}"/></DataTemplate>
+  </local:WorkspacePage.Resources>
+  <Grid Margin="24">
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <StackPanel Margin="0,0,0,18"><TextBlock Text="{DynamicResource Ui985B5E0F2CCF}" FontSize="26" FontWeight="SemiBold"/></StackPanel>
+    <TabControl x:Name="SettingsTabs" Grid.Row="1" Background="{DynamicResource ThemeSurface}" Foreground="{DynamicResource ThemeText}" BorderBrush="{DynamicResource ThemeBorder}" Padding="18">
+      <TabItem><TabItem.Header><TextBlock Text="{DynamicResource UiF03841529528}" Foreground="{DynamicResource ThemeText}" Margin="8,5"/></TabItem.Header><StackPanel>
+        <TextBlock Text="{DynamicResource UiEBB14DC5074B}" Style="{StaticResource Label}"/>
+        <ComboBox ItemsSource="{Binding Microphones}" SelectedValuePath="Id" SelectedValue="{Binding MicrophoneId}" Padding="10" IsEnabled="{Binding Runtime.CanSpeak}"><ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Name}" Foreground="{DynamicResource ThemeText}"/></DataTemplate></ComboBox.ItemTemplate></ComboBox>
+
+        <Button Content="{DynamicResource Ui8BC912B90E03}" HorizontalAlignment="Left" Margin="0,16,0,0" Click="RefreshClick" IsEnabled="{Binding Runtime.CanConfigure}"/>
+
+      </StackPanel></TabItem>
+      <TabItem><TabItem.Header><TextBlock Text="{DynamicResource Ui24A0D703AFD4}" Foreground="{DynamicResource ThemeText}" Margin="8,5"/></TabItem.Header><ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="0,0,16,0"><StackPanel>
+        <TextBlock Text="{DynamicResource Ui3E157F94830A}" Style="{StaticResource Label}" Margin="0,2,0,8"/>
+        <ComboBox ItemsSource="{Binding Voices}" SelectedValuePath="Id" SelectedValue="{Binding Voice}" ItemTemplate="{StaticResource ChoiceTemplate}" Padding="9"/>
+        <TextBlock Text="{DynamicResource UiD2C790BED7F9}" Style="{StaticResource Label}"/>
+        <ComboBox ItemsSource="{Binding Styles}" SelectedValuePath="Id" SelectedValue="{Binding VoiceStyle}" ItemTemplate="{StaticResource ChoiceTemplate}" Padding="9"/>
+        <Grid Margin="0,16,0,0"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="{DynamicResource Ui8D8A8440BC62}" Foreground="{DynamicResource ThemeText}"/><TextBlock Grid.Column="1" Text="{Binding ElementName=EffectSlider, Path=Value, StringFormat={}{0:P0}}" Foreground="{DynamicResource ThemeAccentInk}"/></Grid>
+        <Slider x:Name="EffectSlider" Value="{Binding RobotAmount}" Minimum="0" Maximum="1" TickFrequency="0.05" IsSnapToTickEnabled="True" IsEnabled="{Binding EffectEnabled}" Margin="0,7,0,0"/>
+        <Grid Margin="0,14,0,0"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="{DynamicResource UiE588669702E0}" Foreground="{DynamicResource ThemeText}"/><TextBlock Grid.Column="1" Text="{Binding ElementName=RateSlider, Path=Value, StringFormat={}{0:F2}×}" Foreground="{DynamicResource ThemeAccentInk}"/></Grid>
+        <Slider x:Name="RateSlider" Value="{Binding SpeechRate}" Minimum="0.85" Maximum="1.2" TickFrequency="0.05" IsSnapToTickEnabled="True" Margin="0,7,0,0"/>
+        <Grid Margin="0,14,0,0"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="{DynamicResource UiF052B49C06DD}" Foreground="{DynamicResource ThemeText}"/><TextBlock Grid.Column="1" Text="{Binding ElementName=PitchSlider, Path=Value, StringFormat={}{0:+0.0;-0.0;0}}" Foreground="{DynamicResource ThemeAccentInk}"/></Grid>
+        <Slider x:Name="PitchSlider" Value="{Binding VoicePitch}" Minimum="-6" Maximum="6" TickFrequency="0.5" SmallChange="0.5" LargeChange="1" IsSnapToTickEnabled="True" Margin="0,7,0,0" AutomationProperties.Name="{DynamicResource UiF052B49C06DD}"/>
+        <Grid><TextBlock Text="{DynamicResource Ui443C49DA2A36}" Foreground="{DynamicResource ThemeMuted}" FontSize="12"/><TextBlock Text="{DynamicResource Ui357CCC3E75B9}" HorizontalAlignment="Right" Foreground="{DynamicResource ThemeMuted}" FontSize="12"/></Grid>
+        <Grid Margin="0,14,0,0"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="{DynamicResource UiE2EED72A8256}" Foreground="{DynamicResource ThemeText}"/><TextBlock Grid.Column="1" Text="{Binding ElementName=VolumeSlider, Path=Value, StringFormat={}{0:P0}}" Foreground="{DynamicResource ThemeAccentInk}"/></Grid>
+        <Slider x:Name="VolumeSlider" Value="{Binding Volume}" Minimum="0" Maximum="1" TickFrequency="0.05" IsSnapToTickEnabled="True" Margin="0,7,0,0"/>
+        <WrapPanel Margin="0,18,0,0"><Button Content="{DynamicResource UiA738A353EEB5}" Click="PreviewClick" ToolTip="{DynamicResource UiB21996BF9C86}" IsEnabled="{Binding Runtime.CanSpeak}"/><Button Content="{DynamicResource Ui3396400DA0C4}" Click="StopClick" IsEnabled="{Binding Runtime.Busy}"/></WrapPanel>
+
+      </StackPanel></ScrollViewer></TabItem>
+      <TabItem><TabItem.Header><TextBlock Text="{DynamicResource Ui132B8F4355BF}" Foreground="{DynamicResource ThemeText}" Margin="8,5"/></TabItem.Header><ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="0,0,16,0"><StackPanel>
+        <TextBlock Text="{DynamicResource Ui327B7A8A8415}" Style="{StaticResource Label}"/><CheckBox Content="{DynamicResource Ui4E44E36ACC06}" IsChecked="{Binding WakeMode}" Foreground="{DynamicResource ThemeText}" Margin="0,8"/>
+        <TextBlock Text="{DynamicResource Ui00678F52D1B0}" Style="{StaticResource Hint}"/>
+        <TextBlock Text="{DynamicResource Ui38A7BE02AFAD}" Style="{StaticResource Label}"/>
+        <DockPanel><TextBlock DockPanel.Dock="Right" Text="{Binding ElementName=WaitSlider, Path=Value, StringFormat={StaticResource Ui8ED2D26D4DAD}}" Foreground="{DynamicResource ThemeAccentInk}" Width="65" TextAlignment="Right"/><Slider x:Name="WaitSlider" Value="{Binding CommandWaitSeconds}" Minimum="4" Maximum="15" TickFrequency="1" IsSnapToTickEnabled="True"/></DockPanel>
+
+<CheckBox Content="{DynamicResource Ui45328EB9A0A8}" IsChecked="{Binding WakeSound}" Foreground="{DynamicResource ThemeText}" Margin="0,12,0,0"/>
+<CheckBox Content="{DynamicResource Ui02CB1D303708}" IsChecked="{Binding FollowUpListening}" Foreground="{DynamicResource ThemeText}" Margin="0,12,0,0"/>
+<TextBlock Text="{DynamicResource Ui846F9325CAAA}" Style="{StaticResource Hint}"/>
+
+      </StackPanel></ScrollViewer></TabItem>
+      <TabItem x:Name="ApplicationTab"><TabItem.Header><TextBlock Text="{DynamicResource Ui26B855CC1660}" Foreground="{DynamicResource ThemeText}" Margin="8,5"/></TabItem.Header><ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="0,0,16,0"><StackPanel>
+        <TextBlock Text="{DynamicResource Ui1731619EFA3A}" Style="{StaticResource Label}" Margin="0,2,0,8"/>
+        <ComboBox x:Name="AppearanceBox" ItemsSource="{Binding Appearances}" SelectedValuePath="Id" SelectedValue="{Binding Appearance}" ItemTemplate="{StaticResource ChoiceTemplate}" Padding="9" AutomationProperties.Name="{DynamicResource Ui1731619EFA3A}"/>
+
+        <TextBlock Text="{DynamicResource Ui9BD9638FCD11}" Style="{StaticResource Label}"/>
+        <ComboBox x:Name="ColorStyleBox" ItemsSource="{Binding ColorStyles}" SelectedValuePath="Id" SelectedValue="{Binding ColorStyle}"
+                  ItemTemplate="{StaticResource ChoiceTemplate}" Padding="9" AutomationProperties.Name="{DynamicResource Ui9BD9638FCD11}"/>
+
+        <TextBlock Text="{DynamicResource Ui9089A73112CC}" Style="{StaticResource Label}"/>
+        <ComboBox ItemsSource="{Binding Languages}" SelectedValuePath="Id" SelectedValue="{Binding InterfaceLanguage}" ItemTemplate="{StaticResource ChoiceTemplate}" Padding="9"/>
+        <TextBlock Text="{DynamicResource UiB64B75F7F0BB}" Style="{StaticResource Hint}"/>
+        <TextBlock Text="{DynamicResource Ui39293E2ABA62}" Style="{StaticResource Label}"/>
+        <CheckBox Content="{DynamicResource Ui810F7494EF7E}" IsChecked="{Binding StartWithWindows}" Foreground="{DynamicResource ThemeText}" Margin="0,8"/>
+        <CheckBox Content="{DynamicResource UiFCF22584553F}" IsChecked="{Binding StartInTray}" Foreground="{DynamicResource ThemeText}" Margin="0,8"/>
+        <CheckBox Content="{DynamicResource UiFD4B5D5A5B2F}" IsChecked="{Binding ListenOnStartup}" Foreground="{DynamicResource ThemeText}" Margin="0,8"/>
+
+
+        <TextBlock Text="{DynamicResource UiD8D79B0695EE}" Style="{StaticResource Label}"/><CheckBox Content="{DynamicResource UiC23F0B5C92A3}" IsChecked="{Binding ShowLog}" Foreground="{DynamicResource ThemeText}" Margin="0,8"/><CheckBox Content="{DynamicResource Ui92A8E45E91A6}" IsChecked="{Binding ReduceMotion}" Foreground="{DynamicResource ThemeText}" Margin="0,8"/>
+
+        <TextBlock Text="{DynamicResource UiDA4DA4E3527C}" Style="{StaticResource Label}"/><Button Content="{DynamicResource Ui64648201372F}" Click="RestartClick" IsEnabled="{Binding Runtime.CanConfigure}" HorizontalAlignment="Left" Margin="0,4,0,0"/>
+        <TextBlock Text="{DynamicResource Ui42A4753D1AB3}" Style="{StaticResource Hint}"/>
+        <TextBlock Text="{x:Static local:App.DisplayVersion}" Foreground="{DynamicResource ThemeMuted}" FontSize="12" Margin="0,28,0,0"/>
+      </StackPanel></ScrollViewer></TabItem>
+    </TabControl>
+    <StackPanel Grid.Row="2" Margin="0,14,0,14"><TextBlock x:Name="SaveFeedback" Foreground="{DynamicResource ThemeAccentInk}" FontSize="13"/><TextBlock x:Name="OperationFeedback" Text="{Binding Runtime.Status}" Foreground="{DynamicResource ThemeMuted}" TextWrapping="Wrap" Visibility="Collapsed" Margin="0,4,0,0"/></StackPanel>
+    <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right"><Button Content="{DynamicResource Ui8FBE9B75CBDF}" Click="CancelClick"/><Button Content="{DynamicResource UiB4D30CAE5289}" x:Name="SavePreferencesButton" Click="SaveClick" Background="{DynamicResource ThemeAccent}" Foreground="{DynamicResource ThemeAccentText}" FontWeight="SemiBold" Margin="0"/></StackPanel>
+  </Grid>
+</local:WorkspacePage>

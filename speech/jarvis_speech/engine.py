@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import onnxruntime as ort
 
-from jarvis_speech.voice_effects import apply_effect
+from jarvis_speech.voice_effects import apply_effect, apply_pitch, normalize_pitch
 from jarvis_speech.wake import WAKE_NAMES
 
 
@@ -67,10 +67,17 @@ class Engine:
         self.wake.SetWords(True)
         self.vocabulary = "браузер, Джарвис, скриншот, громкость, телеграм, стим, иксбокс"
         self.choosing = False
+        self.task_interrupt = False
 
     def set_vocabulary(self, text="", choosing=False):
+        self.task_interrupt = False
         self.vocabulary = "браузер, Джарвис, скриншот, громкость, тише, громче, стоп, останови, телеграм, стим, иксбокс, пауза, продолжи, закрой, папку, каталог, переключись, сверни, " + str(text)[:1500]
         self.choosing = bool(choosing)
+
+    def set_task_interrupt(self):
+        self.task_interrupt = True
+        self.choosing = False
+        self.vocabulary = "Джарвис, останови задачу, отмени задачу, Jarvis, stop task, cancel task"
 
     def wake_boundary(self, pcm: bytes) -> int | None:
         final = self.wake.AcceptWaveform(pcm)
@@ -101,12 +108,13 @@ class Engine:
         samples = np.frombuffer(pcm, dtype="<i2").astype(np.float32) / 32768
         segments, _ = self.asr.transcribe(
             samples,
-            language="ru",
+            language=None if self.task_interrupt else "ru",
             beam_size=5,
             temperature=0,
             condition_on_previous_text=False,
             vad_filter=False,
-            initial_prompt=("Выбор игры: первую, вторую, третью, четвертую, пятую, шестую, седьмую, восьмую, девятую, десятую. Вариант один. Вариант два. Отмена."
+            initial_prompt=("Останови задачу. Отмени задачу. Stop task. Cancel task." if self.task_interrupt else
+                            "Выбор игры: первую, вторую, третью, четвертую, пятую, шестую, седьмую, восьмую, девятую, десятую. Вариант один. Вариант два. Отмена."
                             if self.choosing else "Джарвис. Открой браузер. Запусти приложение. Закрой окно. Открой папку. Пауза. Продолжи. Дальше. Назад. Тише. Громче. Стоп. Отмена."),
             hotwords=self.vocabulary,
             no_speech_threshold=0.6,
@@ -118,7 +126,7 @@ class Engine:
         text = self.transcribe(pcm)
         return text, round((time.perf_counter() - started) * 1000)
 
-    def synthesize(self, text: str, voice="dmitri", style="natural", amount=0.45, rate=1.0) -> bytes:
+    def synthesize(self, text: str, voice="dmitri", style="natural", amount=0.45, rate=1.0, pitch=0) -> bytes:
         from piper import PiperVoice, SynthesisConfig
 
         if len(text) > 500:
@@ -127,7 +135,8 @@ class Engine:
             raise ValueError("Unsupported voice or speech rate")
         if voice not in self.voices:
             self.voices[voice] = PiperVoice.load(str(self.models / "piper" / f"ru_RU-{voice}-medium.onnx"))
-        key = (text, voice, style, round(amount, 2), round(rate, 2))
+        pitch = normalize_pitch(pitch)
+        key = (text, voice, style, round(amount, 2), round(rate, 2), pitch)
         if key not in self.speech_cache:
             stream = io.BytesIO()
             with wave.open(stream, "wb") as out:
@@ -136,5 +145,5 @@ class Engine:
                 )
             if len(self.speech_cache) >= 32:
                 self.speech_cache.clear()
-            self.speech_cache[key] = apply_effect(stream.getvalue(), style, amount)
+            self.speech_cache[key] = apply_effect(apply_pitch(stream.getvalue(), pitch), style, amount)
         return self.speech_cache[key]

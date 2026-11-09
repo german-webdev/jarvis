@@ -6,6 +6,12 @@ namespace Jarvis.App.Controls;
 
 public sealed class VoiceVisualizer : FrameworkElement
 {
+    public static readonly DependencyProperty AccentBrushProperty = ThemeBrush("AccentBrush");
+    public static readonly DependencyProperty IdleBrushProperty = ThemeBrush("IdleBrush");
+    public static readonly DependencyProperty ErrorBrushProperty = ThemeBrush("ErrorBrush");
+    public static readonly DependencyProperty SpeakingBrushProperty = ThemeBrush("SpeakingBrush");
+    private static DependencyProperty ThemeBrush(string name) => DependencyProperty.Register(name, typeof(Brush), typeof(VoiceVisualizer),
+        new FrameworkPropertyMetadata(Brushes.Teal, FrameworkPropertyMetadataOptions.AffectsRender));
     public static readonly DependencyProperty LevelProperty = DependencyProperty.Register(nameof(Level), typeof(double), typeof(VoiceVisualizer), new FrameworkPropertyMetadata(0d, FrameworkPropertyMetadataOptions.AffectsRender));
     public static readonly DependencyProperty PhaseProperty = DependencyProperty.Register(nameof(Phase), typeof(AssistantPhase), typeof(VoiceVisualizer), new FrameworkPropertyMetadata(AssistantPhase.Idle, FrameworkPropertyMetadataOptions.AffectsRender));
     public static readonly DependencyProperty ReduceMotionProperty = DependencyProperty.Register(nameof(ReduceMotion), typeof(bool), typeof(VoiceVisualizer), new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.AffectsRender));
@@ -18,6 +24,10 @@ public sealed class VoiceVisualizer : FrameworkElement
 
     public VoiceVisualizer()
     {
+        SetResourceReference(AccentBrushProperty, "ThemeAccentInk");
+        SetResourceReference(IdleBrushProperty, "ThemeMuted");
+        SetResourceReference(ErrorBrushProperty, "ThemeError");
+        SetResourceReference(SpeakingBrushProperty, "ThemeSpeaking");
         Loaded += (_, _) => CompositionTarget.Rendering += RenderFrame;
         Unloaded += (_, _) => CompositionTarget.Rendering -= RenderFrame;
         IsHitTestVisible = false;
@@ -38,9 +48,9 @@ public sealed class VoiceVisualizer : FrameworkElement
         base.OnRender(dc);
         var width = ActualWidth; var height = ActualHeight;
         if (width < 1 || height < 1) return;
-        var color = Phase == AssistantPhase.Speaking ? Color.FromRgb(134, 164, 255) : Color.FromRgb(91, 224, 204);
-        if (Phase == AssistantPhase.Fault) color = Color.FromRgb(244, 145, 135);
-        if (Phase == AssistantPhase.Idle) color = Color.FromRgb(83, 111, 135);
+        var brushProperty = Phase switch { AssistantPhase.Speaking => SpeakingBrushProperty, AssistantPhase.Fault => ErrorBrushProperty,
+            AssistantPhase.Idle => IdleBrushProperty, _ => AccentBrushProperty };
+        var color = ((SolidColorBrush)GetValue(brushProperty)).Color;
         var center = new Point(width / 2, height / 2);
         var glow = new RadialGradientBrush(Color.FromArgb(22, color.R, color.G, color.B), Colors.Transparent);
         dc.DrawEllipse(glow, null, center, width * 0.44, height * 0.48);

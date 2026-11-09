@@ -1,0 +1,18 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <SolidColorBrush x:Key="ThemeWindow" Color="#21191D"/>
+  <SolidColorBrush x:Key="ThemeSurface" Color="#2B2027"/>
+  <SolidColorBrush x:Key="ThemeRaised" Color="#3C2B34"/>
+  <SolidColorBrush x:Key="ThemeInput" Color="#2B2027"/>
+  <SolidColorBrush x:Key="ThemeText" Color="#F5EBEF"/>
+  <SolidColorBrush x:Key="ThemeMuted" Color="#D0B6BF"/>
+  <SolidColorBrush x:Key="ThemeBorder" Color="#795360"/>
+  <SolidColorBrush x:Key="ThemeAccent" Color="#F18EA4"/>
+  <SolidColorBrush x:Key="ThemeAccentText" Color="#32101D"/>
+  <SolidColorBrush x:Key="ThemeAccentInk" Color="#FFAABD"/>
+  <SolidColorBrush x:Key="ThemeSelection" Color="#59313F"/>
+  <SolidColorBrush x:Key="ThemeSelectionText" Color="#FFF0F5"/>
+  <SolidColorBrush x:Key="ThemeHover" Color="#4B303A"/>
+  <SolidColorBrush x:Key="ThemeError" Color="#FFCA83"/>
+  <SolidColorBrush x:Key="ThemeSpeaking" Color="#D9B7E8"/>
+  <SolidColorBrush x:Key="ThemeCompanionAccent" Color="#F18EA4"/>
+</ResourceDictionary>

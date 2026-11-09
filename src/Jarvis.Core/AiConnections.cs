@@ -41,6 +41,7 @@ public sealed record AiConfiguration
 {
     public bool Enabled { get; init; }
     public bool UseForUnknownCommands { get; init; }
+    public bool AllowLocalActions { get; init; }
     public string? ActiveConnectionId { get; init; }
     public List<AiConnection> Connections { get; init; } = [];
     [System.Text.Json.Serialization.JsonIgnore]
@@ -81,6 +82,13 @@ public sealed class AiConnectionStore(string path)
 
 public static class AiRouting
 {
+    public static string? ExplicitTask(string text)
+    {
+        var match = Regex.Match(text.Trim(), @"^(?:(?:джарвис|джервис|джарвиз|чарвис|jarvis)[,\s]+)?(?:задача (?:ии|нейросети)|ai task)[,\s:]+(.+)$", RegexOptions.IgnoreCase);
+        return match.Success ? match.Groups[1].Value.Trim() : null;
+    }
+    public static bool IsStopTask(string text) => Regex.IsMatch(text.Trim(),
+        @"^(?:(?:джарвис|джервис|джарвиз|чарвис|jarvis)[,\s]+)?(?:останови задачу|отмени задачу|stop task|cancel task)[.!?]*$", RegexOptions.IgnoreCase);
     public static string? ExplicitQuestion(string text)
     {
         var match = Regex.Match(text.Trim(), @"^(?:(?:джарвис|джервис|джарвиз|чарвис|jarvis)[,\s]+)?(?:спроси (?:нейросеть|ии)|вопрос (?:нейросети|к нейросети))[,\s:]+(.+)$", RegexOptions.IgnoreCase);

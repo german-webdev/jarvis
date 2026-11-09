@@ -9,6 +9,16 @@ public static class MediaControl
     {
         token.ThrowIfCancellationRequested();
         var info = session.GetPlaybackInfo();
+        if (intent is Intent.MediaSeekForward or Intent.MediaSeekBackward)
+        {
+            if (!info.Controls.IsPlaybackPositionEnabled) return new(false, "Этот источник не поддерживает перемотку через Windows.");
+            var timeline = session.GetTimelineProperties();
+            if (timeline.MaxSeekTime <= timeline.MinSeekTime) return new(false, "У этого источника нет доступного диапазона перемотки.");
+            var position = timeline.Position + TimeSpan.FromSeconds(intent == Intent.MediaSeekForward ? 10 : -10);
+            var ticks = Math.Clamp(position.Ticks, timeline.MinSeekTime.Ticks, timeline.MaxSeekTime.Ticks);
+            bool acceptedSeek = await session.TryChangePlaybackPositionAsync(ticks).AsTask(token);
+            return new(false, acceptedSeek ? "Передал команду перемотки на 10 секунд." : "Источник не принял перемотку.");
+        }
         if (intent == Intent.MediaPause && info.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Paused)
             return new(true, "Воспроизведение уже на паузе.");
         if (intent == Intent.MediaPlay && info.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing)

@@ -105,7 +105,7 @@ def main():
     download("https://raw.githubusercontent.com/snakers4/silero-vad/066409f3d9db45a30d21dfcbf9147826ffdd7052/LICENSE", payload / "third-party" / "silero-LICENSE.txt")
     shutil.copy2(ROOT / "scripts" / "python_utf8_manifest.py", sources / "python_utf8_manifest.py")
     shutil.copy2(ROOT / "installer" / "THIRD-PARTY.md", payload / "third-party" / "README.md")
-    (payload / "jarvis.install.json").write_text(json.dumps({"version": "0.10.0", "architecture": "win-x64"}), encoding="utf-8")
+    (payload / "jarvis.install.json").write_text(json.dumps({"version": "0.14.1", "architecture": "win-x64"}), encoding="utf-8")
     hashes = {}
     for path in payload.rglob("*"):
         if path.is_file():

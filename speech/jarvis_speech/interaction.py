@@ -12,6 +12,15 @@ def address_only(text: str) -> bool:
     return bool(words) and all(w in WAKE_NAMES for w in words)
 
 
+def is_stop_task(text: str) -> bool:
+    # Keep identical to AiRouting.IsStopTask. The host validates again before canceling.
+    return re.fullmatch(
+        r"(?:(?:джарвис|джервис|джарвиз|чарвис|jarvis)[,\s]+)?"
+        r"(?:останови задачу|отмени задачу|stop task|cancel task)[.!?]*",
+        text.strip(), re.IGNORECASE,
+    ) is not None
+
+
 class Interaction:
     def __init__(self, engine, emit):
         self.engine = engine
@@ -28,7 +37,7 @@ class Interaction:
         self.segmenter = Segmenter()
 
     def start(self, mode: str, wait_seconds=8):
-        if mode not in {"command", "wake"}:
+        if mode not in {"command", "wake", "task_interrupt"}:
             raise ValueError("Unknown listening mode")
         if not 4 <= wait_seconds <= 15:
             raise ValueError("Command wait must be between 4 and 15 seconds")
@@ -36,7 +45,7 @@ class Interaction:
         self.mode = mode
         self.from_wake = mode == "wake"
         self.wait_frames = round(wait_seconds / FRAME_SECONDS)
-        self.segmenter = Segmenter(wait_seconds=wait_seconds)
+        self.segmenter = Segmenter(wait_seconds=wait_seconds, maximum_seconds=4 if mode == "task_interrupt" else 10)
         self.engine.reset()
 
     def feed(self, pcm: bytes):
@@ -69,6 +78,16 @@ class Interaction:
             result = self.segmenter.feed(frame, self.engine.vad.probability(frame))
             if result:
                 outcome, audio = result
+                if self.mode == "task_interrupt":
+                    # No transcript/processing/empty events, vocabulary, or ordinary routing.
+                    if outcome == "audio":
+                        text, _ = self.engine.recognize(audio)
+                        self.engine.vad.reset()
+                        if is_stop_task(text):
+                            self.reset()
+                            self.emit("task_stop", text=text)
+                            return
+                    continue
                 if outcome == "audio":
                     # Keep collecting microphone packets while checking a wake-mode candidate.
                     self.emit("processing", keep_capture=self.from_wake)

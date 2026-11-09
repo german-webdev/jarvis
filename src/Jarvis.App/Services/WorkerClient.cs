@@ -6,11 +6,22 @@ using System.Threading.Channels;
 
 namespace Jarvis.App.Services;
 
-public sealed class WorkerClient : IAsyncDisposable
+public interface IWorkerClient : IAsyncDisposable
+{
+    event Action<JsonElement>? Message;
+    event Action<string>? Failed;
+    void Start(string root);
+    bool Send(object message);
+}
+
+public sealed class WorkerClient : IWorkerClient
 {
     private Process? _process;
     private readonly Channel<string> _outgoing = Channel.CreateBounded<string>(new BoundedChannelOptions(128)
-    { SingleReader = true, FullMode = BoundedChannelFullMode.Wait });
+    { SingleReader = false, FullMode = BoundedChannelFullMode.Wait });
+    private readonly object _sendGate = new();
+    private int _queuedAudio;
+    private bool _interruptCapture;
     private readonly CancellationTokenSource _stop = new();
     private Task? _writer;
     private Task? _reader;
@@ -44,7 +55,10 @@ public sealed class WorkerClient : IAsyncDisposable
             try
             {
                 await foreach (var line in _outgoing.Reader.ReadAllAsync(_stop.Token))
-                { await _process.StandardInput.WriteLineAsync(line); await _process.StandardInput.FlushAsync(); }
+                {
+                    if (IsAudio(line)) Interlocked.Decrement(ref _queuedAudio);
+                    await _process.StandardInput.WriteLineAsync(line); await _process.StandardInput.FlushAsync();
+                }
             }
             catch (Exception ex) { if (!_disposed) Failed?.Invoke(ex.Message); }
         });
@@ -72,7 +86,38 @@ public sealed class WorkerClient : IAsyncDisposable
         });
     }
 
-    public bool Send(object message) => !_disposed && _outgoing.Writer.TryWrite(JsonSerializer.Serialize(message));
+    private static bool IsAudio(string line)
+    {
+        using var json = JsonDocument.Parse(line);
+        return json.RootElement.GetProperty("type").GetString() == "audio";
+    }
+
+    public bool Send(object message)
+    {
+        var line = JsonSerializer.Serialize(message);
+        using var json = JsonDocument.Parse(line);
+        var type = json.RootElement.GetProperty("type").GetString();
+        lock (_sendGate)
+        {
+            if (_disposed) return false;
+            // Control boundaries discard queued PCM/TTS. At most one write may already
+            // be in flight; its immutable session is checked again by the worker/host.
+            if (type is "start" or "cancel" or "transcribe")
+            {
+                _interruptCapture = type == "start" && json.RootElement.TryGetProperty("mode", out var mode) && mode.GetString() == "task_interrupt";
+                while (_outgoing.Reader.TryRead(out var discarded))
+                    if (IsAudio(discarded)) Interlocked.Decrement(ref _queuedAudio);
+            }
+            if (type == "audio")
+            {
+                if (_interruptCapture && Volatile.Read(ref _queuedAudio) >= 16) return true;
+                Interlocked.Increment(ref _queuedAudio);
+            }
+            if (_outgoing.Writer.TryWrite(line)) return true;
+            if (type == "audio") Interlocked.Decrement(ref _queuedAudio);
+            return false;
+        }
+    }
 
     public async ValueTask DisposeAsync()
     {

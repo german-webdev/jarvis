@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 
 namespace Jarvis.Core;
 
-public sealed record LaunchTarget(string Id, string Name, string Kind, string Target, string Source, string[] Aliases, bool Enabled = false, string? InstallDirectory = null)
+public sealed record LaunchTarget(string Id, string Name, string Kind, string Target, string Source, string[] Aliases, bool Enabled = false, string? InstallDirectory = null, bool MediaPlayer = false)
 {
     [JsonIgnore] public string[] AutomaticAliases => NameVariants.Automatic(Name);
     [JsonIgnore] public IEnumerable<string> Names => new[] { Name }.Concat(AutomaticAliases).Concat(NameVariants.SplitCustom(Aliases).SelectMany(NameVariants.Expand)).Distinct();
@@ -17,6 +17,8 @@ public sealed record LaunchTarget(string Id, string Name, string Kind, string Ta
             "exe" => Path.IsPathFullyQualified(Target) && Path.GetExtension(Target).Equals(".exe", StringComparison.OrdinalIgnoreCase),
             "shortcut" => Path.IsPathFullyQualified(Target) && Path.GetExtension(Target).Equals(".lnk", StringComparison.OrdinalIgnoreCase),
             "url" => Id.StartsWith("site:", StringComparison.Ordinal) && WebSites.TryNormalizeAddress(Target, out _),
+            "audio" or "video" => Path.IsPathFullyQualified(Target) && MediaLibrary.KindForPath(Target) == Kind,
+            "media-folder" => Path.IsPathFullyQualified(Target),
             _ => false
         });
 }

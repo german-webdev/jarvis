@@ -7,7 +7,23 @@ namespace Jarvis.App.Services;
 
 public record Microphone(string Id, string Name);
 
-public sealed class AudioService : IDisposable
+public interface IAudioService : IDisposable
+{
+    event Action<long, byte[]>? Audio;
+    event Action<float>? Level;
+    event Action<float>? PlaybackLevel;
+    event Action<long, string>? Failed;
+    event Action? CaptureStateChanged;
+    bool IsCapturing { get; }
+    IReadOnlyList<Microphone> GetDevices();
+    string? GetDefaultDeviceId();
+    void Start(string id, long session);
+    void StopCapture();
+    Task PlayAsync(byte[] wav, CancellationToken token, float volume = 0.8f);
+    void StopPlayback();
+}
+
+public sealed class AudioService : IAudioService
 {
     public static byte[] ReadyCue()
     {
@@ -25,10 +41,12 @@ public sealed class AudioService : IDisposable
     private WasapiCapture? _capture;
     private MMDevice? _device;
     private WasapiOut? _player;
-    public event Action<byte[]>? Audio;
+    public event Action<long, byte[]>? Audio;
     public event Action<float>? Level;
     public event Action<float>? PlaybackLevel;
-    public event Action<string>? Failed;
+    public event Action<long, string>? Failed;
+    public event Action? CaptureStateChanged;
+    public bool IsCapturing => _capture?.CaptureState is CaptureState.Starting or CaptureState.Capturing;
 
     public static string? DefaultDeviceId()
     {
@@ -50,7 +68,10 @@ public sealed class AudioService : IDisposable
         return devices;
     }
 
-    public void Start(string id)
+    public IReadOnlyList<Microphone> GetDevices() => Devices();
+    public string? GetDefaultDeviceId() => DefaultDeviceId();
+
+    public void Start(string id, long session)
     {
         StopCapture();
         using var enumerator = new MMDeviceEnumerator();
@@ -65,11 +86,16 @@ public sealed class AudioService : IDisposable
             for (int i = 0; i + 1 < data.Length; i += 2)
                 peak = Math.Max(peak, Math.Abs((float)BitConverter.ToInt16(data, i)) / 32768f);
             Level?.Invoke(peak);
-            Audio?.Invoke(data);
+            // The capture's immutable session survives a callback racing with Stop/Start.
+            Audio?.Invoke(session, data);
         };
         capture.RecordingStopped += (_, args) =>
-        { if (args.Exception != null && _capture == capture) Failed?.Invoke(args.Exception.Message); };
-        try { capture.StartRecording(); }
+        {
+            if (_capture != capture) return;
+            CaptureStateChanged?.Invoke();
+            if (args.Exception != null) Failed?.Invoke(session, args.Exception.Message);
+        };
+        try { capture.StartRecording(); CaptureStateChanged?.Invoke(); }
         catch { StopCapture(); throw; }
     }
 
@@ -77,7 +103,11 @@ public sealed class AudioService : IDisposable
     {
         var capture = _capture;
         _capture = null;
-        if (capture != null) { capture.StopRecording(); capture.Dispose(); }
+        if (capture != null)
+        {
+            try { capture.StopRecording(); capture.Dispose(); }
+            finally { CaptureStateChanged?.Invoke(); }
+        }
         _device?.Dispose(); _device = null;
         Level?.Invoke(0);
     }

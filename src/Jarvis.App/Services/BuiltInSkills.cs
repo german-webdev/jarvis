@@ -13,11 +13,12 @@ public static class BuiltInSkills
         new DelegateSkill([Intent.AssistantPresent], (_, _) => Task.FromResult(new SkillResult(true, "А я кто, просячий хвостик?"))),
         new DelegateSkill([Intent.HowAreYou], (_, _) => Task.FromResult(new SkillResult(true, "Всё хорошо. На связи и готов помочь."))),
         new DelegateSkill([Intent.CloseTarget, Intent.FocusTarget, Intent.MinimizeWindow, Intent.CloseWindow], windows.ExecuteAsync),
-        new DelegateSkill([Intent.MediaPause, Intent.MediaPlay, Intent.MediaNext, Intent.MediaPrevious, Intent.MusicVolumeUp, Intent.MusicVolumeDown], music.ExecuteAsync),
+        new DelegateSkill([Intent.MediaPause, Intent.MediaPlay, Intent.MediaNext, Intent.MediaPrevious, Intent.MediaSeekForward, Intent.MediaSeekBackward, Intent.MusicVolumeUp, Intent.MusicVolumeDown], music.ExecuteAsync),
         new DelegateSkill([Intent.StartMusic], music.StartAsync),
         new DelegateSkill([Intent.OpenTargetFolder], (request, token) =>
         {
             var target = targets().SingleOrDefault(t => t.Enabled && t.Id == request.TargetId);
+            if (target != null && MediaLibrary.IsLibraryEntry(target)) return TargetLauncher.OpenMediaFolderAsync(target, token);
             return target == null ? Task.FromResult(new SkillResult(false, "Приложение исчезло из каталога.")) : AppLocations.OpenAsync(target, token);
         }),
         new DelegateSkill([Intent.OpenBrowser], async (_, token) => { var result = await BrowserLauncher.OpenAsync(token); return new(result.Verified, result.Message); }),

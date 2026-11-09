@@ -18,17 +18,25 @@ public partial class MainWindow : Window
     private bool _hiddenNoticeShown;
     private bool _startupListenPending = true;
     private readonly TrayIcon _tray;
+    private MiniWindow? _mini;
+    public MiniWindow? Mini => _mini;
 
     public MainWindow(string root, string[] args)
     {
-        Ui.Apply(new Jarvis.Core.SettingsStore(Path.Combine(root, "data", "settings.json")).Load().Settings.InterfaceLanguage);
+        var settings = new Jarvis.Core.SettingsStore(Path.Combine(root, "data", "settings.json")).Load().Settings;
+        Ui.Apply(settings.InterfaceLanguage);
+        ThemeManager.Apply(settings.Appearance, settings.ColorStyle);
         InitializeComponent();
         _viewModel = new MainViewModel(root); DataContext = _viewModel;
+        LayoutRoot.Children.Remove(HomePage); Shell.Page = HomePage;
+        Shell.Navigate = NavigateTo;
         _viewModel.ExitRequested += () => Dispatcher.BeginInvoke(RequestExit);
-        _tray = new TrayIcon(_viewModel, ShowFromTray, OpenSettings, RequestExit, () => IsEnabled && !_closing);
+        _tray = new TrayIcon(_viewModel, ShowFromTray, OpenSettings, RequestExit,
+            () => IsEnabled && !_closing && !OwnedWindows.Cast<Window>().Any(window => window.IsVisible)
+                && !(_mini?.OwnedWindows.Cast<Window>().Any(window => window.IsVisible) ?? false),
+            () => { if (_mini?.IsVisible == true) HideMini(); else ShowMini(); }, () => _mini?.IsVisible == true);
         KeyDown += (_, e) =>
         {
-            if (e.Key == Key.Escape) { _startupListenPending = false; _viewModel.Stop(); }
             if (e.Key == Key.OemComma && Keyboard.Modifiers == ModifierKeys.Control) OpenSettings();
         };
         Closing += OnClosing;
@@ -78,20 +86,86 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ListenClick(object sender, RoutedEventArgs e) => _viewModel.Listen();
-    private void StopClick(object sender, RoutedEventArgs e) { _startupListenPending = false; _viewModel.Stop(); }
+    private bool NavigateTo(string section)
+    {
+        if (section == _section) return true;
+        if (Shell.Page is WorkspacePage previous && !previous.ConfirmLeave()) return false;
+        if (section == "home") { Shell.Page = HomePage; Shell.Select("home"); _section = "home"; return true; }
+        WorkspacePage page = section switch
+        {
+            "catalog" => new CatalogPage(_viewModel),
+            "sites" => new SitesPage(_viewModel),
+            "media" => new MediaPage(_viewModel),
+            "ai" => new AiConnectionsPage(_viewModel.Ai),
+            "settings" => new SettingsPage(_viewModel),
+            "help" => new HelpPage(),
+            _ => throw new ArgumentOutOfRangeException(nameof(section))
+        };
+        OpenPage(page, section); return true;
+    }
+
+    private string _section = "home";
+    private void OpenPage(WorkspacePage page, string section)
+    {
+        page.Navigate = NavigateTo;
+        page.CloseRequested += result =>
+        {
+            if (result == null && !page.ConfirmLeave()) return;
+            Shell.Page = HomePage; Shell.Select("home"); _section = "home";
+        };
+        Shell.Page = page; Shell.Select(section); _section = section;
+    }
+
+    private void VoiceControlClick(object sender, RoutedEventArgs e)
+        => ToggleVoice();
+    private async void RestartWorkerClick(object sender, RoutedEventArgs e) => await _viewModel.RestartAsync();
+    private void MessageTextUpdated(object sender, System.Windows.Data.DataTransferEventArgs e)
+    {
+        if (ReferenceEquals(sender, TranscriptText)) TranscriptScroll?.ScrollToTop();
+        else if (ReferenceEquals(sender, ReplyText)) ReplyScroll?.ScrollToTop();
+    }
+    private void ToggleVoice()
+    {
+        if (_viewModel.CanStop) { _startupListenPending = false; _viewModel.Stop(); }
+        else if (_viewModel.CanListen) _viewModel.Listen();
+    }
     private void SettingsClick(object sender, RoutedEventArgs e) => OpenSettings();
     private void CatalogClick(object sender, RoutedEventArgs e)
-    { _viewModel.Stop(); new CatalogWindow(_viewModel) { Owner = this }.ShowDialog(); }
+    { NavigateTo("catalog"); }
     private void SitesClick(object sender, RoutedEventArgs e)
-    { _viewModel.Stop(); new SitesWindow(_viewModel) { Owner = this }.ShowDialog(); }
+    { NavigateTo("sites"); }
+    private void MediaClick(object sender, RoutedEventArgs e)
+    { NavigateTo("media"); }
     private void AiClick(object sender, RoutedEventArgs e)
-    { _startupListenPending = false; _viewModel.Stop(); new AiConnectionsWindow(_viewModel.Ai) { Owner = this }.ShowDialog(); }
-    private async void TextCommandClick(object sender, RoutedEventArgs e)
+    { NavigateTo("ai"); }
+    private void TextCommandClick(object sender, RoutedEventArgs e) => OpenTextCommand(this);
+    private async void OpenTextCommand(Window owner)
     {
-        _viewModel.Stop(keepChoice: true);
-        var dialog = new TextCommandWindow { Owner = this };
-        if (dialog.ShowDialog() == true) await _viewModel.RunTextAsync(dialog.Command);
+        if (!_viewModel.CanEnterText || _closing || _closed) return;
+        var dialog = new TextCommandWindow { Owner = owner, DataContext = _viewModel };
+        if (owner is MiniWindow) dialog.ContentRendered += (_, _) => MiniWindow.ConstrainWindow(dialog);
+        bool? result;
+        try { result = dialog.ShowDialog(); }
+        finally { if (owner is MiniWindow mini) mini.ResumeAfterDialog(); }
+        if (result == true) await _viewModel.RunTextAsync(dialog.Command);
+    }
+    private void MiniClick(object sender, RoutedEventArgs e) => ShowMini();
+    public void ShowMini()
+    {
+        if (_closing || _closed || !IsEnabled) return;
+        if (_mini == null)
+        {
+            _mini = new MiniWindow(_viewModel, ToggleVoice, () => OpenTextCommand(_mini!), ShowFromTray, HideMini);
+            _mini.IsVisibleChanged += (_, _) => _tray.RefreshMiniState();
+        }
+        if (!_mini.IsEnabled) return;
+        _mini.Show(); Hide();
+        _tray.RefreshMiniState();
+    }
+    public void HideMini()
+    {
+        if (_mini?.OwnedWindows.Cast<Window>().Any(window => window.IsVisible) == true) return;
+        _mini?.Hide(); _tray.RefreshMiniState();
     }
     private void ArtifactClick(object sender, RoutedEventArgs e)
     {
@@ -101,14 +175,19 @@ public partial class MainWindow : Window
     }
     private void OpenSettings()
     {
-        _startupListenPending = false;
-        _viewModel.Stop();
-        new SettingsWindow(_viewModel) { Owner = this }.ShowDialog();
+        ShowFromTray();
+        NavigateTo("settings");
     }
     private void ClearHistoryClick(object sender, RoutedEventArgs e) => _viewModel.ClearHistory();
     public void ShowFromTray()
     {
         if (_closing || _closed) return;
+        // A modal command belongs to Mini. Restore that dialog rather than hiding its owner.
+        if (_mini?.OwnedWindows.Cast<Window>().FirstOrDefault(window => window.IsVisible) is { } miniDialog)
+        {
+            _mini.Show(); _mini.Activate(); miniDialog.Activate(); return;
+        }
+        HideMini();
         Show();
         if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
         Activate();
@@ -123,6 +202,7 @@ public partial class MainWindow : Window
     public void EndWindowsSession()
     {
         _exitRequested = true;
+        _mini?.DisposeForExit();
         _tray.Dispose();
         // Windows may end the dispatcher immediately; release the worker synchronously.
         try { _viewModel.DisposeAsync().AsTask().GetAwaiter().GetResult(); }
@@ -130,7 +210,7 @@ public partial class MainWindow : Window
         _closed = true;
     }
     private void ExitClick(object sender, RoutedEventArgs e) => RequestExit();
-    private void HelpClick(object sender, RoutedEventArgs e) => new HelpWindow { Owner = this }.ShowDialog();
+    private void HelpClick(object sender, RoutedEventArgs e) => NavigateTo("help");
     private async void OnClosing(object? sender, CancelEventArgs e)
     {
         if (_closed) return;
@@ -151,7 +231,9 @@ public partial class MainWindow : Window
                 return;
             }
         }
+        if (Shell.Page is WorkspacePage page && !page.ConfirmLeave()) { _exitRequested = false; return; }
         _closing = true; IsEnabled = false;
+        _mini?.DisposeForExit();
         _tray.Dispose();
         try { await _viewModel.DisposeAsync(); }
         catch (Exception error) { Debug.WriteLine(error); }

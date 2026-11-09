@@ -6,8 +6,11 @@ using Jarvis.Core;
 
 namespace Jarvis.App.Services;
 
-public sealed class WindowControl
+public sealed class WindowControl : ILocalActionWindows
 {
+    private readonly bool _allowOwnWindow;
+    public WindowControl() { }
+    internal WindowControl(bool allowOwnWindow) { _allowOwnWindow = allowOwnWindow; }
     private sealed record Entry(LaunchTarget Target, nint Handle, int Pid, long Started);
     private Dictionary<string, Entry> _entries = [];
     private IReadOnlyDictionary<string, string> _executables = new Dictionary<string, string>();
@@ -108,13 +111,62 @@ public sealed class WindowControl
         return new(false, "Действие с окном не поддерживается.");
     }
 
-    private static bool Current(Entry entry)
+    private bool Current(Entry entry)
     {
         if (!IsWindow(entry.Handle) || !IsWindowVisible(entry.Handle)) return false;
         GetWindowThreadProcessId(entry.Handle, out uint pid);
-        if (pid != entry.Pid || pid == Environment.ProcessId) return false;
+        if (pid != entry.Pid || pid == Environment.ProcessId && !_allowOwnWindow) return false;
         try { using var process = Process.GetProcessById(entry.Pid); return process.StartTime.ToUniversalTime().Ticks == entry.Started; }
         catch { return false; }
+    }
+    public async Task<ObservedWindow?> ObserveAsync(LaunchTarget target, CancellationToken token)
+    {
+        for (var attempt = 0; attempt < 40; attempt++)
+        {
+            token.ThrowIfCancellationRequested();
+            var found = CaptureExact(target);
+            // Multiple windows require an explicit user choice; do not guess by title/order.
+            if (found.Count > 1) return null;
+            if (found.Count == 1) return new(found[0]);
+            await Task.Delay(200, token);
+        }
+        return null;
+    }
+
+    private List<string> CaptureExact(LaunchTarget target)
+    {
+        List<string> found = [];
+        if (!LocalActionExecutor.IsAllowed(target)) return found;
+        EnumWindows((window, _) =>
+        {
+            if (!IsWindowVisible(window) || GetWindow(window, 4) != 0 || GetWindowTextLength(window) == 0) return true;
+            if (DwmGetWindowAttribute(window, 14, out int cloaked, sizeof(int)) == 0 && cloaked != 0) return true;
+            GetWindowThreadProcessId(window, out uint pid);
+            if (pid == 0 || (_allowOwnWindow ? pid != Environment.ProcessId : pid == Environment.ProcessId)) return true;
+            try
+            {
+                using var process = Process.GetProcessById((int)pid);
+                if (process.MainModule?.FileName is not { } path || !SamePath(path, target.Target)) return true;
+                var started = process.StartTime.ToUniversalTime().Ticks;
+                var id = $"window:{pid}:{started}:{window}";
+                _entries[id] = new(target, window, (int)pid, started);
+                found.Add(id);
+            }
+            catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException or ArgumentException or NotSupportedException) { }
+            return true;
+        }, 0);
+        return found;
+    }
+
+    public bool IsCurrent(LaunchTarget target, ObservedWindow window)
+    {
+        if (!_entries.TryGetValue(window.Id, out var entry) || entry.Target != target || !Current(entry)) return false;
+        try
+        {
+            using var process = Process.GetProcessById(entry.Pid);
+            return LocalActionExecutor.IsAllowed(target) && process.MainModule?.FileName is { } path && SamePath(path, target.Target);
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException or ArgumentException or NotSupportedException) { return false; }
     }
     public static bool SamePath(string a, string b) => string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), StringComparison.OrdinalIgnoreCase);
     public static bool Inside(string file, string? directory) => directory != null

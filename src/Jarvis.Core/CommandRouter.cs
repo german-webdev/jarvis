@@ -4,8 +4,8 @@ namespace Jarvis.Core;
 
 public enum Intent { OpenBrowser, Cancel, Unknown, LaunchTarget, Screenshot, OpenScreenshots, VolumeUp, VolumeDown, SetVolume, Mute, Unmute, Time, Date, Help,
     CloseTarget, FocusTarget, MinimizeWindow, CloseWindow, OpenTargetFolder, MediaPause, MediaPlay, MediaNext, MediaPrevious, StartMusic, MusicVolumeUp, MusicVolumeDown,
-    ExitAssistant, AssistantPresent, HowAreYou, ShutdownComputer, RestartComputer, SleepComputer, HibernateComputer }
-public record CommandRequest(Intent Intent, string? TargetId = null, int? Value = null, string? Explanation = null, string[]? CandidateIds = null, Intent? CandidateIntent = null);
+    ExitAssistant, AssistantPresent, HowAreYou, ShutdownComputer, RestartComputer, SleepComputer, HibernateComputer, MediaSeekForward, MediaSeekBackward }
+public record CommandRequest(Intent Intent, string? TargetId = null, int? Value = null, string? Explanation = null, string[]? CandidateIds = null, Intent? CandidateIntent = null, MediaScope MediaScope = MediaScope.Current);
 
 public static partial class CommandRouter
 {
@@ -38,12 +38,12 @@ public static partial class CommandRouter
         if (OpenPhrase().IsMatch(phrase)) return new(Intent.OpenBrowser);
         if (phrase is "включи музыку" or "запусти музыку" or "давай музыку")
         {
-            var music = (targets ?? []).Where(t => t.Enabled && t.Kind != "url" && (t.Id == musicTargetId || MusicSelection.IsMusicApp(t))).ToArray();
+            var music = (targets ?? []).Where(t => t.Enabled && MusicSelection.IsMediaApp(t)).ToArray();
             var preferred = music.FirstOrDefault(t => t.Id == musicTargetId);
             if (preferred != null) return new(Intent.StartMusic, preferred.Id);
             return music.Length switch { 1 => new(Intent.StartMusic, music[0].Id),
                 > 1 => new(Intent.Unknown, CandidateIds: music.Select(t => t.Id).ToArray(), CandidateIntent: Intent.StartMusic),
-                _ => new(Intent.Unknown, Explanation: "Музыкальное приложение не найдено. Выбери его в настройках музыки.", CandidateIntent: Intent.StartMusic) };
+                _ => new(Intent.Unknown, Explanation: "Музыкальное приложение не найдено. Добавь плеер через меню «JARVIS → Мультимедиа».", CandidateIntent: Intent.StartMusic) };
         }
         var simple = phrase switch
         {
@@ -60,16 +60,30 @@ public static partial class CommandRouter
             "сколько времени" or "который час" or "скажи время" => Intent.Time,
             "какое сегодня число" or "скажи дату" or "сегодняшняя дата" => Intent.Date,
             "что ты умеешь" or "покажи команды" or "список команд" => Intent.Help,
-            "пауза" or "стоп" or "останови" or "поставь на паузу" or "приостанови воспроизведение"
+            "пауза" or "стоп" or "останови" or "поставь на паузу" or "приостанови воспроизведение" or "пауза видео" or "останови видео" or "поставь видео на паузу" or "пауза музыки" or "поставь музыку на паузу"
                 or "выключи музыку" or "останови музыку" or "отключи музыку" => Intent.MediaPause,
-            "продолжи" or "продолжи воспроизведение" or "возобнови воспроизведение" or "сними с паузы" => Intent.MediaPlay,
+            "продолжи" or "продолжи воспроизведение" or "возобнови воспроизведение" or "сними с паузы" or "продолжи музыку" or "продолжи видео" => Intent.MediaPlay,
+            "перемотай вперед" or "перемотай вперед на 10 секунд" => Intent.MediaSeekForward,
+            "перемотай назад" or "перемотай назад на 10 секунд" => Intent.MediaSeekBackward,
             "следующий трек" or "следующая песня" or "включи следующий трек" or "дальше" or "следующий" or "следующая" => Intent.MediaNext,
             "предыдущий трек" or "предыдущая песня" or "включи предыдущий трек" or "назад" or "предыдущий" or "предыдущая" => Intent.MediaPrevious,
             "сверни окно" or "сверни текущее окно" or "сверни активное окно" => Intent.MinimizeWindow,
             "закрой окно" or "закрой текущее окно" or "закрой активное окно" or "закрой текущее приложение" => Intent.CloseWindow,
             _ => Intent.Unknown
         };
-        if (simple != Intent.Unknown) return new(simple);
+        if (simple != Intent.Unknown) return new(simple, MediaScope: phrase.Contains("музык", StringComparison.Ordinal) ? MediaScope.Music
+            : phrase.Contains("видео", StringComparison.Ordinal) ? MediaScope.Video : MediaScope.Current);
+        var media = Regex.Match(phrase, @"^(?:открой|запусти|включи) (фильм|видео|песню|трек|плеер|медиаплеер) (.+)$");
+        if (media.Success)
+        {
+            var category = media.Groups[1].Value;
+            return MatchTarget(media.Groups[2].Value, targets?.Where(t => category switch
+            {
+                "фильм" or "видео" => t.Kind == "video", "песню" or "трек" => t.Kind == "audio", _ => MusicSelection.IsMediaApp(t)
+            }), Intent.LaunchTarget, "Такой записи нет в мультимедиа. Добавь папку, файл или плеер через меню JARVIS.");
+        }
+        var mediaFolder = Regex.Match(phrase, @"^(?:запусти|включи) папку (.+)$");
+        if (mediaFolder.Success) return MatchTarget(mediaFolder.Groups[1].Value, targets?.Where(t => t.Kind == "media-folder"), Intent.LaunchTarget);
         var folder = Regex.Match(phrase, @"^открой (?:папку|каталог)(?: (?:с|для))?(?: (?:игрой|игры|программой|программы|приложением|приложения))? (.+)$");
         if (folder.Success) return MatchTarget(folder.Groups[1].Value, targets?.Where(t => t.Kind != "url"), Intent.OpenTargetFolder);
         var window = Regex.Match(phrase, @"^(закрой|выключи|переключись на|покажи)(?: (?:игру|приложение|программу))? (.+)$");
@@ -84,7 +98,7 @@ public static partial class CommandRouter
         if (website.Success) return MatchTarget(website.Groups[1].Value, targets?.Where(t => t.Kind == "url"), Intent.LaunchTarget,
             "Такого сайта нет в каталоге. Добавь его через меню «Джарвис → Сайты».");
         var application = Regex.Match(phrase, @"^(?:открой|запусти|включи)(?: пожалуйста)?(?: мне)? (?:игру|приложение|программу) (.+)$");
-        if (application.Success) return MatchTarget(application.Groups[1].Value, targets?.Where(t => t.Kind != "url"), Intent.LaunchTarget);
+        if (application.Success) return MatchTarget(application.Groups[1].Value, targets?.Where(t => t.Kind != "url" && !MediaLibrary.IsLibraryEntry(t)), Intent.LaunchTarget);
         if (!launch.Success) return new(Intent.Unknown);
         return MatchTarget(launch.Groups[1].Value, targets, Intent.LaunchTarget);
     }

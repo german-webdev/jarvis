@@ -18,11 +18,14 @@ public sealed class HttpAiClient(HttpClient client)
             .OfType<string>().Where(n => n.Length is > 0 and <= 200 && !n.Any(char.IsControl)).Distinct().Order().Take(500).ToArray();
     }
 
-    public async Task<string> AskAsync(AiConnection connection, string key, string question, CancellationToken token)
+    public Task<string> AskAsync(AiConnection connection, string key, string question, CancellationToken token) =>
+        AskAsync(connection, key, new AiMessage[] { new("user", question) }, token);
+
+    public async Task<string> AskAsync(AiConnection connection, string key, IReadOnlyList<AiMessage> conversation, CancellationToken token)
     {
         if (string.IsNullOrWhiteSpace(connection.Model)) throw new InvalidDataException("Выбери модель в настройках нейросети.");
-        if (question.Length is 0 or > 4000) throw new InvalidDataException("Вопрос должен содержать от 1 до 4000 символов.");
-        var messages = new[] { new { role = "system", content = SystemPrompt }, new { role = "user", content = question } };
+        AiRequest.ValidateInput(conversation);
+        var messages = new[] { new AiMessage("system", SystemPrompt) }.Concat(conversation).ToArray();
         object body = connection.Provider == "ollama"
             ? new { model = connection.Model, messages, stream = false, options = new { num_predict = 512 } }
             : new { model = connection.Model, messages, stream = false, max_tokens = 512 };

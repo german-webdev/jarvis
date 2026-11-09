@@ -31,15 +31,15 @@ public class MusicSelectionTests
         Assert.Equal(Intent.MediaPause, command.Intent);
         Assert.Null(command.TargetId);
     }
-    [Fact] public void PausedMusicWinsOverBrowserEvenWhenBrowserIsPlaying()
+    [Fact] public void PlayingVideoWinsOverPausedPreferredMusic()
     {
-        var choice = MusicSelection.Choose([new("Chrome", null, true), new("ru.yandex.desktop.music", "yandex", false)], _apps, null);
-        Assert.Equal("ru.yandex.desktop.music", choice.SourceId);
+        var choice = MusicSelection.Choose([new("Chrome", null, true), new("ru.yandex.desktop.music", "yandex", false)], _apps, "yandex");
+        Assert.Equal("Chrome", choice.SourceId);
     }
     [Fact] public void PreferredPlayerDisappearingNeverStartsBrowser()
     {
-        Assert.Null(MusicSelection.Choose([new("Chrome", null, false)], _apps, "yandex").SourceId);
-        Assert.Null(MusicSelection.Choose([new("a", "yandex", false), new("b", "yandex", true)], _apps, "yandex").SourceId);
+        Assert.Null(MusicSelection.Choose([new("Chrome", null, false)], _apps, "yandex", MediaScope.Music).SourceId);
+        Assert.Null(MusicSelection.Choose([new("a", "yandex", false), new("b", "yandex", true)], _apps, "yandex", MediaScope.Music).SourceId);
     }
     [Fact] public void MultipleMusicAppsOrVideosNeedExplicitChoice()
     {

@@ -7,12 +7,14 @@ namespace Jarvis.App;
 
 public partial class App : Application
 {
+    public static string DisplayVersion => "JARVIS " + typeof(App).Assembly.GetName().Version!.ToString(3);
     private Mutex? _instance;
     private EventWaitHandle? _showWindow;
     private RegisteredWaitHandle? _showWait;
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        ThemeManager.Initialize();
         if (e.Args.FirstOrDefault() == "--focus-window") { Shutdown(WindowFocus.Run(e.Args)); return; }
         Jarvis.Core.InstallationLayout layout;
         try { layout = Jarvis.Core.InstallationLayout.Resolve(AppContext.BaseDirectory, Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)); }
@@ -58,6 +60,7 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        ThemeManager.Shutdown();
         _showWait?.Unregister(null);
         _showWindow?.Dispose();
         _instance?.ReleaseMutex(); _instance?.Dispose();

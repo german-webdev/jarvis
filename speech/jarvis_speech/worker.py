@@ -2,11 +2,11 @@
 
 import base64
 import json
-import queue
 import sys
 import threading
 import time
 import traceback
+from collections import deque
 from pathlib import Path
 
 from jarvis_speech.engine import Engine
@@ -16,6 +16,41 @@ from jarvis_speech.segmenter import FRAME_BYTES
 
 def emit(kind, session=0, **values):
     print(json.dumps({"type": kind, "session": session, **values}, ensure_ascii=False), flush=True)
+
+
+class CommandInbox:
+    """Bounded PCM backlog; session controls replace pending work, never wait on ASR."""
+
+    def __init__(self):
+        self._condition = threading.Condition()
+        self._pending = deque()
+        self.generation = 0
+        self.session = 0
+        self.audio_limit = 128
+
+    def put(self, message):
+        with self._condition:
+            kind = message.get("type")
+            if kind in {"start", "cancel", "transcribe"}:
+                self.generation += 1
+                self.session = message.get("session", 0)
+                self.audio_limit = 16 if kind == "start" and message.get("mode") == "task_interrupt" else 128
+                self._pending.clear()
+            elif kind == "audio":
+                if not isinstance(message.get("pcm"), str) or len(message["pcm"]) > 42668:
+                    raise ValueError("Audio packet exceeds one second")
+                if message.get("session") != self.session or len(self._pending) >= self.audio_limit:
+                    return
+            elif kind != "quit" and len(self._pending) >= 128:
+                raise ValueError("Protocol queue is full")
+            self._pending.append((self.generation, message))
+            self._condition.notify()
+
+    def get(self):
+        with self._condition:
+            while not self._pending:
+                self._condition.wait()
+            return self._pending.popleft()
 
 
 def read_commands(inbox):
@@ -37,39 +72,56 @@ def main():
     sys.stdout.reconfigure(encoding="utf-8", errors="strict")
     sys.stdin.reconfigure(encoding="utf-8", errors="strict")
     root = Path(__file__).resolve().parents[2]
-    session = 0
     try:
-        engine = Engine(root, lambda text: emit("loading", text=text),
-                        wake_observer=lambda text: emit("wake_heard", session, text=text))
+        engine = Engine(root, lambda text: emit("loading", text=text))
     except Exception as error:
         traceback.print_exc(file=sys.stderr)
         emit("fatal", text=f"Не удалось загрузить голосовой модуль: {error}")
         return 1
-    inbox = queue.Queue(maxsize=128)
+    inbox = CommandInbox()
     threading.Thread(target=read_commands, args=(inbox,), daemon=True).start()
     emit("ready", protocol=1, asr="small/cpu/int8", voice="ru_RU-dmitri-medium")
-    interaction = Interaction(engine, lambda kind, **values: emit(kind, session, **values))
+    return run_worker(engine, inbox, emit)
+
+
+def run_worker(engine, inbox, output):
+    session = 0
+    generation = -1
+
+    def current_emit(kind, **values):
+        # Recognition cannot be interrupted inside the native ASR call. Its result is
+        # discarded if stdin has already accepted a newer control/session boundary.
+        if generation == inbox.generation:
+            output(kind, session, **values)
+
+    engine.wake_observer = lambda text: current_emit("wake_heard", text=text)
+    interaction = Interaction(engine, current_emit)
 
     def transcribe(pcm):
-        emit("processing", session)
+        current_emit("processing")
         started = time.perf_counter()
         text = engine.transcribe(pcm)
-        emit("transcript", session, text=text, elapsed_ms=round((time.perf_counter() - started) * 1000))
+        current_emit("transcript", text=text, elapsed_ms=round((time.perf_counter() - started) * 1000))
 
     while True:
-        command = inbox.get()
+        incoming_generation, command = inbox.get()
         kind = command.get("type")
         incoming = command.get("session", 0)
         try:
             if kind == "quit":
                 return 0
             if kind == "start":
-                engine.set_vocabulary(command.get("vocabulary", ""), choosing=command.get("choosing", False))
+                generation = incoming_generation
                 session = int(incoming)
                 mode = command.get("mode", "command")
+                if mode == "task_interrupt":
+                    engine.set_task_interrupt()
+                else:
+                    engine.set_vocabulary(command.get("vocabulary", ""), choosing=command.get("choosing", False))
                 interaction.start(mode, float(command.get("wait_seconds", 8)))
-                emit("listening", session, mode=mode)
+                current_emit("listening", mode=mode)
             elif kind == "cancel":
+                generation = incoming_generation
                 interaction.reset()
                 engine.reset()
                 session = int(incoming)
@@ -81,9 +133,12 @@ def main():
                     style=command.get("style", "natural"),
                     amount=float(command.get("amount", 0.45)),
                     rate=float(command.get("rate", 1.0)),
+                    pitch=command.get("pitch", 0),
                 )
-                emit("speech", incoming, wav=base64.b64encode(wav).decode("ascii"))
+                if incoming_generation == inbox.generation:
+                    output("speech", incoming, wav=base64.b64encode(wav).decode("ascii"))
             elif kind == "transcribe":
+                generation = incoming_generation
                 engine.set_vocabulary(command.get("vocabulary", ""))
                 session = int(incoming)
                 interaction.reset()
@@ -96,17 +151,18 @@ def main():
                     for i in range(0, len(pcm) - FRAME_BYTES + 1, FRAME_BYTES)
                 ]
                 if sum(p >= 0.5 for p in probabilities) < 5:
-                    emit("empty", session)
+                    current_emit("empty")
                 else:
                     transcribe(pcm)
-            elif kind == "audio" and incoming == session:
+            elif kind == "audio" and incoming == session and incoming_generation == generation == inbox.generation:
                 interaction.feed(base64.b64decode(command["pcm"], validate=True))
             elif kind not in {"audio"}:
                 raise ValueError("Unknown protocol operation")
         except Exception as error:
             interaction.reset()
             traceback.print_exc(file=sys.stderr)
-            emit("error", incoming, text=str(error))
+            if incoming_generation == inbox.generation:
+                output("error", incoming, text=str(error))
 
 
 if __name__ == "__main__":

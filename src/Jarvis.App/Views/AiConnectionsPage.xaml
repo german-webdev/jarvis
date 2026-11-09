@@ -1,0 +1,43 @@
+<local:WorkspacePage xmlns:local="clr-namespace:Jarvis.App" x:Class="Jarvis.App.AiConnectionsPage" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Background="{DynamicResource ThemeWindow}" Foreground="{DynamicResource ThemeText}" FontFamily="Segoe UI" FontSize="14">
+  <local:WorkspacePage.Resources>
+    <Style x:Key="Label" TargetType="TextBlock"><Setter Property="Margin" Value="0,14,0,7"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
+    <Style x:Key="Hint" TargetType="TextBlock"><Setter Property="Foreground" Value="{DynamicResource ThemeMuted}"/><Setter Property="TextWrapping" Value="Wrap"/><Setter Property="FontSize" Value="12"/><Setter Property="Margin" Value="0,7,0,0"/></Style>
+  </local:WorkspacePage.Resources>
+  <Grid Margin="24">
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <StackPanel Margin="0,0,0,16"><TextBlock Text="{DynamicResource UiD0AC51CD6D01}" FontSize="26" FontWeight="SemiBold"/></StackPanel>
+    <StackPanel x:Name="GeneralOptions" Grid.Row="1" Margin="0,0,0,18">
+      <CheckBox x:Name="EnabledBox" Content="{DynamicResource UiD52F04C55CA4}" Foreground="{DynamicResource ThemeText}" Margin="0,0,0,10"/>
+      <DockPanel><TextBlock Text="{DynamicResource Ui545E374E8BD4}" VerticalAlignment="Center" Margin="0,0,14,0"/><ComboBox x:Name="ActiveBox" DisplayMemberPath="Name" SelectedValuePath="Id" Padding="7"/></DockPanel>
+      <CheckBox x:Name="FallbackBox" Content="{DynamicResource Ui4A5C123F3A8B}" Foreground="{DynamicResource ThemeText}" Margin="0,10,0,0"/>
+      <CheckBox x:Name="ActionsBox" Foreground="{DynamicResource ThemeText}" Margin="0,10,0,0"/>
+
+    </StackPanel>
+    <Grid Grid.Row="2"><Grid.ColumnDefinitions><ColumnDefinition Width="240"/><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+      <DockPanel><WrapPanel x:Name="ManageButtons" DockPanel.Dock="Bottom" Margin="0,12,0,0"><Button Content="{DynamicResource Ui71038C53BBC4}" Click="AddClick" Padding="12,9"/><Button Content="{DynamicResource UiBE99B1361201}" Click="RemoveClick" Padding="12,9" Margin="0"/></WrapPanel><ListBox x:Name="ConnectionsList" DisplayMemberPath="Name" SelectionChanged="SelectionChanged" Background="{DynamicResource ThemeSurface}" Foreground="{DynamicResource ThemeText}" BorderThickness="0" Padding="8"/></DockPanel>
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled" Grid.Column="2" VerticalScrollBarVisibility="Auto"><StackPanel x:Name="Editor" IsEnabled="False" Margin="0,0,10,0">
+        <TextBlock Text="{DynamicResource Ui8C96C91A7C22}" Style="{StaticResource Label}" Margin="0,0,0,7"/><TextBox x:Name="NameBox" Padding="8" MaxLength="100"/>
+        <TextBlock Text="{DynamicResource UiBD0E8F49C7CB}" Style="{StaticResource Label}"/><ComboBox x:Name="ProviderBox" DisplayMemberPath="Label" SelectedValuePath="Id" SelectionChanged="ProviderChanged" Padding="8"/>
+        <StackPanel x:Name="HttpPanel">
+          <TextBlock Text="{DynamicResource Ui4C96DDD3865A}" Style="{StaticResource Label}"/><TextBox x:Name="EndpointBox" Padding="8"/>
+          <TextBlock x:Name="EndpointHint" Style="{StaticResource Hint}"/>
+          <TextBlock Text="{DynamicResource Ui5CED5BD906CD}" Style="{StaticResource Label}"/><PasswordBox x:Name="KeyBox" Padding="8"/>
+          <TextBlock x:Name="KeyStatus" Style="{StaticResource Hint}"/>
+          <CheckBox x:Name="RemoveKeyBox" Content="{DynamicResource Ui2FF51A1F2A43}" Foreground="{DynamicResource ThemeText}" Margin="0,8,0,0"/>
+          <TextBlock Text="{DynamicResource Ui46AB317CAE33}" Style="{StaticResource Hint}"/>
+        </StackPanel>
+        <StackPanel x:Name="SubscriptionPanel" Visibility="Collapsed">
+          <TextBlock x:Name="SubscriptionHint" Style="{StaticResource Hint}"/>
+          <WrapPanel Margin="0,12,0,0"><Button x:Name="SignInButton" Content="{DynamicResource UiB972EB6287AC}" Click="SignInClick" Padding="12,9"/><Button Content="{DynamicResource Ui3364AF49D2BA}" Click="SignOutClick" Padding="12,9"/></WrapPanel>
+          <Border Background="{DynamicResource ThemeRaised}" Padding="12" Margin="0,10,0,8" CornerRadius="6"><TextBlock x:Name="AuthStatus" TextWrapping="Wrap" Foreground="{DynamicResource ThemeAccentInk}"/></Border>
+        </StackPanel>
+        <TextBlock Text="{DynamicResource UiF3BDF7CCE355}" Style="{StaticResource Label}"/><ComboBox x:Name="ModelBox" IsEditable="True" Padding="8"/>
+        <TextBlock x:Name="ModelHint" Style="{StaticResource Hint}"/>
+        <WrapPanel Margin="0,14,0,8"><Button x:Name="ModelsButton" Content="{DynamicResource UiB00CF3C8FBEC}" Click="ModelsClick" Padding="12,9"/><Button Content="{DynamicResource UiD6D828DC8806}" Click="CheckClick" Padding="12,9"/></WrapPanel>
+      </StackPanel></ScrollViewer>
+    </Grid>
+    <DockPanel Grid.Row="3" Margin="0,14,0,14"><Button x:Name="ReopenBrowser" Content="{DynamicResource UiF596E732224A}" Click="ReopenBrowserClick" Visibility="Collapsed" DockPanel.Dock="Right" Margin="10,0,0,0"/><Button x:Name="CancelOperation" Content="{DynamicResource Ui0343402BA682}" Click="CancelOperationClick" Visibility="Collapsed" DockPanel.Dock="Right" Margin="12,0,0,0"/><TextBlock x:Name="StatusText"  Foreground="{DynamicResource ThemeMuted}" TextWrapping="Wrap" VerticalAlignment="Center"/></DockPanel>
+    <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right"><Button Content="{DynamicResource UiA7A4033657E8}" Click="CloseClick"/><Button x:Name="SaveButton" Content="{DynamicResource UiB4D30CAE5289}" Click="SaveClick" Background="{DynamicResource ThemeAccent}" Foreground="{DynamicResource ThemeAccentText}" Margin="0"/></StackPanel>
+  </Grid>
+</local:WorkspacePage>

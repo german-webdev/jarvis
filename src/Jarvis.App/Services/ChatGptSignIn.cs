@@ -10,6 +10,7 @@ namespace Jarvis.App.Services;
 
 public sealed class ChatGptSignIn(string root, ChatGptPlanClient client)
 {
+    public event Action<AiConnection>? AccountChanging;
     private readonly SemaphoreSlim _gate = new(1);
     private string AccountPath(AiConnection connection)
     {
@@ -48,6 +49,7 @@ public sealed class ChatGptSignIn(string root, ChatGptPlanClient client)
 
     public async Task SignInAsync(AiConnection connection, Action<Uri> openBrowser, IProgress<string>? progress, CancellationToken token)
     {
+        AccountChanging?.Invoke(connection);
         await _gate.WaitAsync(token);
         try
         {
@@ -63,6 +65,7 @@ public sealed class ChatGptSignIn(string root, ChatGptPlanClient client)
             progress?.Report("Проверяю подтверждение аккаунта ChatGPT…");
             var account = await client.ExchangeAsync(attempt, query, previous, token);
             Save(connection, account);
+            AccountChanging?.Invoke(connection);
         }
         finally { _gate.Release(); }
     }
@@ -84,6 +87,7 @@ public sealed class ChatGptSignIn(string root, ChatGptPlanClient client)
     }
     public async Task<bool> SignOutAsync(AiConnection connection, CancellationToken token)
     {
+        AccountChanging?.Invoke(connection);
         await _gate.WaitAsync(token);
         try
         {
@@ -92,6 +96,7 @@ public sealed class ChatGptSignIn(string root, ChatGptPlanClient client)
             try { await client.RevokeAsync(account, token); revoked = true; }
             catch (Exception) { /* Clear locally even if remote revocation cannot be confirmed. */ }
             Save(connection, account with { AccessToken = "", RefreshToken = "", IdToken = "", Scope = "", ExpiresAt = default });
+            AccountChanging?.Invoke(connection);
             return revoked;
         }
         finally { _gate.Release(); }

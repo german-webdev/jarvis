@@ -29,7 +29,7 @@ public sealed record OAuthAttempt(string State, string Nonce, string Verifier, s
 }
 
 /// <summary>Public Sign in with ChatGPT flow. No CLI, browser cookies or API keys.</summary>
-public sealed class ChatGptPlanClient(HttpClient http)
+public sealed partial class ChatGptPlanClient(HttpClient http)
 {
     public const string Issuer = "https://auth.openai.com";
     public const string Resource = "https://api.openai.com/v1";
@@ -163,14 +163,17 @@ public sealed class ChatGptPlanClient(HttpClient http)
             .Select(m => m.GetProperty("slug").GetString()).OfType<string>().Take(500).ToArray();
     }
 
-    public async Task<string> AskAsync(ChatGptAccount account, string model, string question, CancellationToken token)
+    public Task<string> AskAsync(ChatGptAccount account, string model, string question, CancellationToken token) =>
+        AskAsync(account, model, new AiMessage[] { new("user", question) }, token);
+
+    public async Task<string> AskAsync(ChatGptAccount account, string model, IReadOnlyList<AiMessage> conversation, CancellationToken token)
     {
         if (string.IsNullOrWhiteSpace(model)) throw new InvalidDataException("Выбери модель в настройках нейросети.");
-        if (question.Length is 0 or > 4000) throw new InvalidDataException("Вопрос должен содержать от 1 до 4000 символов.");
+        AiRequest.ValidateInput(conversation);
         using var request = new HttpRequestMessage(HttpMethod.Post, Resource + "/responses");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", account.AccessToken);
         request.Content = JsonContent.Create(new { model, instructions = HttpAiClient.SystemPrompt,
-            input = new[] { new { role = "user", content = question } }, store = false, stream = true });
+            input = conversation, store = false, stream = true });
         using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
         CheckStatus(response);
         await using var stream = await response.Content.ReadAsStreamAsync(token);

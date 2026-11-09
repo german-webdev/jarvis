@@ -44,6 +44,7 @@ public sealed record AiConfiguration
     public bool Enabled { get; init; }
     public bool UseForUnknownCommands { get; init; }
     public bool AllowLocalActions { get; init; }
+    public string ProtectedChromeToken { get; init; } = "";
     public string? ActiveConnectionId { get; init; }
     public List<AiConnection> Connections { get; init; } = [];
     [System.Text.Json.Serialization.JsonIgnore]
@@ -54,6 +55,8 @@ public sealed record AiConfiguration
         if (Connections.Count > 30 || Connections.Select(c => c.Id).Distinct().Count() != Connections.Count)
             throw new InvalidDataException("Проверь список подключений: не более 30, без повторов.");
         foreach (var connection in Connections) connection.Validate();
+        if (ProtectedChromeToken.Length > 2048 || ProtectedChromeToken.Any(char.IsWhiteSpace))
+            throw new InvalidDataException("Проверь код подключения Chrome.");
         if (Enabled && Active == null) throw new InvalidDataException("Выбери подключение для ответов нейросети.");
     }
 }
@@ -111,4 +114,7 @@ public static class AiRouting
 
     public static bool RequestsChannelPage(string text) => Regex.IsMatch(CommandRouter.Normalize(text),
         @"\b(?:открой|открыть|покажи|найди|поищи|перейди на|зайди на|open|find|go to) (?:(?:мне|пожалуйста|(?:на )?(?:ютуб\w*|youtube)) )*(?:канал|channel)\b");
+
+    public static bool RequestsChannelVideo(string text) => Regex.IsMatch(CommandRouter.Normalize(text),
+        @"\b(?:канал|channel)\b.+?\b(?:и|затем|потом|and|then) (?:запусти|включи|открой|посмотри|play|open|watch)\b.*\b(?:видео|ролик\w*|video)\b");
 }

@@ -9,7 +9,7 @@ using Jarvis.Core;
 namespace Jarvis.App.Services;
 
 internal sealed partial class PlaywrightBrowserTools(McpStdioClient client, DirectoryInfo workspace, Action<string>? progress,
-    IReadOnlyList<AiToolDefinition> tools) : IAiToolSession
+    IReadOnlyList<AiToolDefinition> tools, ChromeBrowserConnection? chrome) : IAiToolSession
 {
     private const string Navigate = "browser_navigate";
     private const string Snapshot = "browser_snapshot";
@@ -23,7 +23,7 @@ internal sealed partial class PlaywrightBrowserTools(McpStdioClient client, Dire
     private const string YouTube = "https://www.youtube.com";
     private static readonly JsonElement Empty = JsonSerializer.SerializeToElement(new { });
     private static readonly AiToolDefinition ReadPage = new(Navigate,
-        "Open any public HTTP or HTTPS page in the temporary browser and read it. For YouTube search, use " +
+        "Open any public HTTP or HTTPS page in the current browser session and read it. For YouTube search, use " +
         "https://www.youtube.com/results?search_query=<URL-encoded query>. Returns an accessibility snapshot or a specific failure.",
         JsonSerializer.SerializeToElement(new { type = "object", properties = new { url = new { type = "string" } },
             required = new[] { "url" }, additionalProperties = false }));
@@ -38,7 +38,7 @@ internal sealed partial class PlaywrightBrowserTools(McpStdioClient client, Dire
 
     public IReadOnlyList<AiToolDefinition> Tools { get; } = tools;
 
-    public static async Task<IAiToolSession> StartAsync(string root, Action<string>? progress, CancellationToken token)
+    public static async Task<IAiToolSession> StartAsync(string root, Action<string>? progress, CancellationToken token, ChromeBrowserConnection? chrome = null)
     {
         var assets = InstallationLayout.AssetRoot(AppContext.BaseDirectory, root);
         var runtime = File.Exists(Path.Combine(assets, InstallationLayout.Marker))
@@ -50,22 +50,35 @@ internal sealed partial class PlaywrightBrowserTools(McpStdioClient client, Dire
         McpStdioClient? client = null;
         try
         {
-            var config = Path.Combine(workspace.FullName, "mcp.json");
-            await File.WriteAllTextAsync(config, """{"browser":{"launchOptions":{"args":["--mute-audio"]},"contextOptions":{"acceptDownloads":false}}}""", token);
             var start = new ProcessStartInfo(node) { WorkingDirectory = workspace.FullName };
             // Do not inherit Node preload options, Playwright overrides, or credentials from the app's environment.
             start.Environment.Clear();
             foreach (var name in new[] { "SystemRoot", "SystemDrive", "WINDIR", "TEMP", "TMP", "PATH", "USERPROFILE", "LOCALAPPDATA", "APPDATA",
                 "ProgramFiles", "ProgramFiles(x86)", "ProgramW6432", "ProgramData" })
                 if (Environment.GetEnvironmentVariable(name) is { } value) start.Environment[name] = value;
-            var executable = BrowserLauncher.GetDefaultExecutable();
-            var defaultName = Path.GetFileName(executable)?.ToLowerInvariant();
-            var channel = defaultName == "chrome.exe" ? "chrome" : "msedge";
-            foreach (var argument in new[] { cli, "--config", config, "--browser=" + channel, "--headless", "--isolated", "--sandbox", "--no-webmcp",
-                "--block-service-workers", "--codegen=none", "--image-responses=omit", "--snapshot-mode=none", "--timeout-navigation=16000",
+            foreach (var argument in new[] { cli, "--sandbox", "--no-webmcp", "--codegen=none", "--image-responses=omit", "--snapshot-mode=none", "--timeout-navigation=16000",
+                "--redact-url-params=token,code,access_token,id_token,refresh_token,session_token",
                 "--output-max-size=1000000", "--blocked-origins=http://localhost;https://localhost;http://127.0.0.1;https://127.0.0.1" }) start.ArgumentList.Add(argument);
-            if (defaultName is "chrome.exe" or "msedge.exe") start.ArgumentList.Add("--executable-path=" + executable);
-            client = await McpStdioClient.StartAsync(start, token);
+            if (chrome != null)
+            {
+                start.ArgumentList.Add("--extension");
+                start.ArgumentList.Add("--browser=chrome");
+                start.Environment["PLAYWRIGHT_MCP_EXTENSION_TOKEN"] = chrome.Token;
+                if (chrome.ExecutablePath != null) start.ArgumentList.Add("--executable-path=" + chrome.ExecutablePath);
+                if (chrome.UserDataDirectory != null) start.ArgumentList.Add("--user-data-dir=" + chrome.UserDataDirectory);
+            }
+            else
+            {
+                var config = Path.Combine(workspace.FullName, "mcp.json");
+                await File.WriteAllTextAsync(config, """{"browser":{"launchOptions":{"args":["--mute-audio"]},"contextOptions":{"acceptDownloads":false}}}""", token);
+                var executable = BrowserLauncher.GetDefaultExecutable();
+                var defaultName = Path.GetFileName(executable)?.ToLowerInvariant();
+                var channel = defaultName == "chrome.exe" ? "chrome" : "msedge";
+                foreach (var argument in new[] { "--config", config, "--browser=" + channel, "--headless", "--isolated", "--block-service-workers" })
+                    start.ArgumentList.Add(argument);
+                if (defaultName is "chrome.exe" or "msedge.exe") start.ArgumentList.Add("--executable-path=" + executable);
+            }
+            client = await McpStdioClient.StartAsync(start, token, ownsChildProcesses: chrome == null);
             var available = (await client.ListToolsAsync(token)).ToDictionary(tool => tool.GetProperty("name").GetString()!, StringComparer.Ordinal);
             if (!available.ContainsKey(Navigate) || !available.ContainsKey(Snapshot) || !available.ContainsKey(Click)) throw new InvalidDataException(Unavailable);
             List<AiToolDefinition> definitions = [ReadPage,
@@ -75,13 +88,13 @@ internal sealed partial class PlaywrightBrowserTools(McpStdioClient client, Dire
                 if (available.TryGetValue(name, out var definition))
                     definitions.Add(new(name, definition.GetProperty("description").GetString()!, JsonSerializer.SerializeToElement(
                         definition.GetProperty("inputSchema").EnumerateObject().Where(item => item.Name != "$schema").ToDictionary(item => item.Name, item => item.Value))));
-            return new PlaywrightBrowserTools(client, workspace, progress, definitions);
+            return new PlaywrightBrowserTools(client, workspace, progress, definitions, chrome);
         }
         catch (Exception) when (!token.IsCancellationRequested)
         {
             if (client != null) await client.DisposeAsync();
             DeleteWorkspace(workspace);
-            throw new InvalidDataException(Unavailable);
+            throw new InvalidDataException(chrome == null ? Unavailable : ChromeBrowserConnection.Unavailable);
         }
         catch
         {
@@ -97,7 +110,7 @@ internal sealed partial class PlaywrightBrowserTools(McpStdioClient client, Dire
         if (arguments.ValueKind != JsonValueKind.Object) return Error("Браузерное действие недоступно.");
         var fields = arguments.EnumerateObject().ToArray();
         if (name == Show)
-            return fields.Length == 0 && _currentPage != null ? new(true, "", "Выполнено.", _currentPage, Complete: true)
+            return fields.Length == 0 && _currentPage != null ? new(true, "", "Выполнено.", _currentPage, Complete: true, AlreadyOpened: chrome != null)
                 : Error("Адрес страницы не подтверждён.");
         _currentPage = null;
         Uri? requested = null;
@@ -129,7 +142,7 @@ internal sealed partial class PlaywrightBrowserTools(McpStdioClient client, Dire
             if (name != Snapshot)
             {
                 var action = await client.CallAsync(name, arguments, token);
-                if (Failed(action)) return new(false, TrimObservation(ReadText(action), 1700), NavigationError);
+                if (Failed(action)) return ToolError(action);
                 if (name == "browser_tabs") actionData = TrimObservation(ReadText(action), 2000);
             }
             var rejectedCookies = false;
@@ -137,9 +150,9 @@ internal sealed partial class PlaywrightBrowserTools(McpStdioClient client, Dire
             {
                 if (attempt > 0) await Task.Delay(600, token);
                 var result = await client.CallAsync(Snapshot, name == Snapshot ? arguments : Empty, token);
-                if (Failed(result)) return new(false, TrimObservation(ReadText(result), 1700), NavigationError);
+                if (Failed(result)) return ToolError(result);
                 var text = ReadText(result);
-                if (channel && !rejectedCookies && TryGetConsentReject(requested!, text, out var target))
+                if (chrome == null && channel && !rejectedCookies && TryGetConsentReject(requested!, text, out var target))
                 {
                     rejectedCookies = true;
                     var reject = await client.CallAsync(Click, JsonSerializer.SerializeToElement(new { target }), token);
@@ -157,7 +170,7 @@ internal sealed partial class PlaywrightBrowserTools(McpStdioClient client, Dire
             }
             return Error(channel ? NoChannel : watch ? NoVideo : NoResults);
         }
-        catch (TimeoutException) { return Error("Браузер не ответил вовремя. Повтори запрос."); }
+        catch (TimeoutException) { return chrome != null ? ChromeError() : Error("Браузер не ответил вовремя. Повтори запрос."); }
         catch (McpResponseTooLargeException)
         { return new(false, "The snapshot is too large. Call browser_snapshot with a smaller depth or a specific target.", "Страница слишком большая для чтения целиком."); }
         catch (Exception error) when (error is IOException or InvalidDataException or JsonException or InvalidOperationException or KeyNotFoundException)
@@ -165,8 +178,23 @@ internal sealed partial class PlaywrightBrowserTools(McpStdioClient client, Dire
     }
 
     private static bool Failed(JsonElement result) => result.TryGetProperty("isError", out var error) && error.ValueKind == JsonValueKind.True;
-    private static string ReadText(JsonElement result) => string.Join('\n', result.GetProperty("content").EnumerateArray()
-        .Where(part => part.GetProperty("type").GetString() == "text").Select(part => part.GetProperty("text").GetString()));
+    private string ReadText(JsonElement result)
+    {
+        var text = string.Join('\n', result.GetProperty("content").EnumerateArray()
+            .Where(part => part.GetProperty("type").GetString() == "text").Select(part => part.GetProperty("text").GetString()));
+        return chrome == null ? text : text.Replace(chrome.Token, "<redacted>", StringComparison.Ordinal);
+    }
+
+    private AiToolObservation ToolError(JsonElement result)
+    {
+        var text = ReadText(result);
+        if (chrome != null && (text.Contains("Playwright Extension not found", StringComparison.OrdinalIgnoreCase)
+            || text.Contains("extension did not connect", StringComparison.OrdinalIgnoreCase)
+            || text.Contains("Extension not connected", StringComparison.OrdinalIgnoreCase))) return ChromeError();
+        return new(false, TrimObservation(text, 1700), NavigationError);
+    }
+
+    private static AiToolObservation ChromeError() => new(false, "", ChromeBrowserConnection.Unavailable, Complete: true);
     private static string TrimObservation(string text, int limit) => text[..Math.Min(text.Length, limit)];
 
     internal static AiToolObservation Observe(Uri? requested, string text)
@@ -199,10 +227,7 @@ internal sealed partial class PlaywrightBrowserTools(McpStdioClient client, Dire
         title = Clean(title, 180);
         if (IsVideoSearch(actual))
         {
-            var videos = VideoLinks().Matches(snapshot).Select(match => new {
-                title = Clean(UnescapeTitle(match.Groups[1].Value), 180),
-                url = "https://www.youtube.com/watch?v=" + match.Groups[2].Value
-            }).Where(video => video.title.Length > 0).DistinctBy(video => video.url).Take(5).ToArray();
+            var videos = ReadVideoLinks(snapshot);
             var channels = ChannelLinks().Matches(snapshot).Select(match => new {
                 name = Clean(UnescapeTitle(match.Groups[1].Value), 180), url = YouTube + match.Groups[2].Value
             }).Where(item => TryPublicPage(item.url, out var uri) && IsChannelPage(uri))
@@ -229,7 +254,14 @@ internal sealed partial class PlaywrightBrowserTools(McpStdioClient client, Dire
             if (heading == null) return Error(NoChannel);
             var handle = ChannelHandleMarker().Match(TrimObservation(snapshot[heading.Index..], 1800));
             if (!handle.Success || (actual.AbsolutePath.StartsWith("/@", StringComparison.Ordinal) &&
-                !Uri.UnescapeDataString(actual.AbsolutePath.Trim('/')).Equals(handle.Groups[1].Value, StringComparison.OrdinalIgnoreCase))) return Error(NoChannel);
+                !Uri.UnescapeDataString(actual.AbsolutePath.Split('/')[1]).Equals(handle.Groups[1].Value, StringComparison.OrdinalIgnoreCase))) return Error(NoChannel);
+            if (actual.AbsolutePath.TrimEnd('/').EndsWith("/videos", StringComparison.Ordinal))
+            {
+                var videos = ReadVideoLinks(snapshot);
+                if (videos.Length == 0) return Error(NoResults);
+                return Observed(actual, new { url = actual.AbsoluteUri, title = channelName, handle = handle.Groups[1].Value, videos,
+                    snapshot = TrimObservation(snapshot, 6500) });
+            }
             return Observed(actual, new { url = actual.AbsoluteUri, title = channelName, handle = handle.Groups[1].Value,
                 snapshot = TrimObservation(snapshot, 6500) });
         }
@@ -304,7 +336,7 @@ internal sealed partial class PlaywrightBrowserTools(McpStdioClient client, Dire
     private static bool IsVideoSearch(Uri uri) => uri.Host == "www.youtube.com" && uri.AbsolutePath == "/results"
         && QueryValue(uri, "search_query").Length is > 0 and <= 300;
 
-    private static bool IsVideoWatch(Uri uri) => uri.Host == "www.youtube.com" && uri.AbsolutePath == "/watch"
+    internal static bool IsVideoWatch(Uri uri) => uri.Host == "www.youtube.com" && uri.AbsolutePath == "/watch"
         && BrowserVideoCommands.ValidId(QueryValue(uri, "v"));
 
     private static string QueryValue(Uri uri, string key) => uri.Query.StartsWith("?" + key + "=", StringComparison.Ordinal) && !uri.Query.Contains('&')
@@ -312,6 +344,10 @@ internal sealed partial class PlaywrightBrowserTools(McpStdioClient client, Dire
 
     private static string Clean(string text, int limit) => new(text.Where(ch => !char.IsControl(ch) && char.GetUnicodeCategory(ch) != System.Globalization.UnicodeCategory.Format).Take(limit).ToArray());
     private static string UnescapeTitle(string title) => Regex.Replace(title, "\\\\([\"\\\\])", "$1");
+    private sealed record VideoLink(string title, string url);
+    private static VideoLink[] ReadVideoLinks(string snapshot) => VideoLinks().Matches(snapshot).Select(match => new VideoLink(
+        Clean(UnescapeTitle(match.Groups[1].Value), 180), YouTube + "/watch?v=" + match.Groups[2].Value))
+        .Where(video => video.title.Length > 0).DistinctBy(video => video.url).Take(5).ToArray();
     private static AiToolObservation Observed(Uri address, object data) => new(true, JsonSerializer.Serialize(data), "", address.AbsoluteUri);
     private static AiToolObservation Error(string message) => new(false, message, message);
 
@@ -321,7 +357,7 @@ internal sealed partial class PlaywrightBrowserTools(McpStdioClient client, Dire
     private static partial Regex VideoHeading();
     [GeneratedRegex("""(?m)^[ \t]*- link "((?:\\[^\r\n]|[^"\\\r\n])+)"[^\r\n]*:\r?\n[ \t]*- /url: (/(?:@|channel/)[^\s]+)""")]
     private static partial Regex ChannelLinks();
-    [GeneratedRegex(@"^(?:/@[\p{L}\p{M}\p{N}_.·-]{1,60}|/channel/UC[A-Za-z0-9_-]{22})$")]
+    [GeneratedRegex(@"^(?:/@[\p{L}\p{M}\p{N}_.·-]{1,60}|/channel/UC[A-Za-z0-9_-]{22})(?:/videos)?$")]
     private static partial Regex ChannelPath();
     [GeneratedRegex("""(?m)^[ \t]*- generic \[ref=[a-z0-9]+\]: "?(@[^\s"]+)"?[ \t]*\r?$""")]
     private static partial Regex ChannelHandleMarker();

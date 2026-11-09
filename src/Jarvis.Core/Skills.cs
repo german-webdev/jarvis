@@ -3,6 +3,7 @@ namespace Jarvis.Core;
 public record SkillResult(bool Verified, string Message, string? ArtifactPath = null, bool Silent = false)
 {
     public string? SourceUrl { get; init; }
+    public bool AlreadyOpened { get; init; }
 }
 public interface ISkill
 {

@@ -29,6 +29,12 @@ public partial class AiConnectionsPage : WorkspacePage
         ActionsBox.IsChecked = service.Configuration.AllowLocalActions;
         ActionsBox.Content = Ui.Text("Разрешить локальные задачи ИИ (ChatGPT)");
         ActionsBox.ToolTip = Ui.Text("«Задача ИИ: открой [приложение], затем переключись на него». Только включённые EXE из каталога. До трёх действий.");
+        ChromeBox.IsChecked = service.Configuration.ProtectedChromeToken.Length > 0;
+        ChromeBox.Content = Ui.Text("Работать в моём Chrome");
+        ChromeInstallButton.Content = Ui.Text("Установить расширение Playwright");
+        ChromeStatusButton.Content = Ui.Text("Открыть страницу кода");
+        System.Windows.Automation.AutomationProperties.SetName(ChromeCodeBox, Ui.Text("Код подключения Chrome"));
+        UpdateChromeHint();
         StatusText.Text = Ui.Text(service.LoadWarning ?? "");
 
         Unloaded += (_, _) => _operation?.Cancel();
@@ -44,7 +50,8 @@ public partial class AiConnectionsPage : WorkspacePage
         } : c).ToArray();
         return System.Text.Json.JsonSerializer.Serialize(new {
             Connections = draft, Enabled = EnabledBox.IsChecked == true, Fallback = FallbackBox.IsChecked == true,
-            Actions = ActionsBox.IsChecked == true, Active = ActiveBox.SelectedValue as string, NewKey = KeyBox.SecurePassword.Length > 0, RemoveKey = RemoveKeyBox.IsChecked == true
+            Actions = ActionsBox.IsChecked == true, Chrome = ChromeBox.IsChecked == true, NewChromeCode = ChromeCodeBox.SecurePassword.Length > 0,
+            Active = ActiveBox.SelectedValue as string, NewKey = KeyBox.SecurePassword.Length > 0, RemoveKey = RemoveKeyBox.IsChecked == true
         });
     }
 
@@ -148,13 +155,36 @@ public partial class AiConnectionsPage : WorkspacePage
         try
         {
             CaptureCurrent();
+            var chromeToken = "";
+            if (ChromeBox.IsChecked == true)
+            {
+                chromeToken = ChromeCodeBox.SecurePassword.Length > 0
+                    ? AiService.Protect(ChromeBrowserConnection.NormalizeToken(ChromeCodeBox.Password))
+                    : _service.Configuration.ProtectedChromeToken;
+                if (chromeToken.Length == 0) throw new InvalidDataException("Вставь код из расширения Playwright.");
+            }
             _service.Save(new AiConfiguration { Enabled = EnabledBox.IsChecked == true, UseForUnknownCommands = FallbackBox.IsChecked == true,
-                AllowLocalActions = ActionsBox.IsChecked == true,
+                AllowLocalActions = ActionsBox.IsChecked == true, ProtectedChromeToken = chromeToken,
                 ActiveConnectionId = ActiveBox.SelectedValue as string, Connections = _connections.ToList() });
+            ChromeCodeBox.Clear();
+            UpdateChromeHint();
             StatusText.Text = Ui.Text("Подключения сохранены.");
             AcceptChanges();
         }
         catch (Exception error) { StatusText.Text = Ui.Text(error is InvalidDataException ? error.Message : "Не удалось сохранить подключения."); }
+    }
+
+    private void UpdateChromeHint() => ChromeHint.Text = Ui.Text(_service.Configuration.ProtectedChromeToken.Length == 0
+        ? "Скопируй код со страницы расширения и вставь его ниже. Выбранная нейросеть читает содержимое страниц рабочей вкладки."
+        : "Код сохранён. Поле нужно только для замены кода.");
+
+    private void ChromeInstallClick(object sender, RoutedEventArgs e) => OpenChromeSetup(ChromeBrowserConnection.StorePage);
+    private void ChromeStatusClick(object sender, RoutedEventArgs e) => OpenChromeSetup(ChromeBrowserConnection.StatusPage);
+
+    private void OpenChromeSetup(Uri address)
+    {
+        try { ChromeBrowserConnection.OpenSetupPage(address); }
+        catch (Exception error) { StatusText.Text = Ui.Text(error is InvalidDataException ? error.Message : "Не удалось открыть Chrome."); }
     }
 
     private async Task OperateAsync(Func<AiConnection, CancellationToken, Task<string>> operation, bool requireSaved = false)

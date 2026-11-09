@@ -3,7 +3,7 @@ using System.Text.Json;
 namespace Jarvis.Core;
 
 public sealed record AiToolDefinition(string Name, string Description, JsonElement Parameters);
-public sealed record AiToolObservation(bool Verified, string Data, string Display, string? SourceUrl = null, bool Complete = false);
+public sealed record AiToolObservation(bool Verified, string Data, string Display, string? SourceUrl = null, bool Complete = false, bool AlreadyOpened = false);
 public sealed record AiToolExchange(IReadOnlyList<JsonElement> ModelOutput, string CallId, AiToolObservation Observation);
 
 public interface IAiToolSession : IAsyncDisposable
@@ -44,7 +44,7 @@ public static class AiToolTask
             observation = await session.InvokeAsync(call.Name, arguments.RootElement, token);
             token.ThrowIfCancellationRequested();
             if (observation.Complete)
-                return new SkillResult(observation.Verified, observation.Display) { SourceUrl = observation.SourceUrl };
+                return new SkillResult(observation.Verified, observation.Display) { SourceUrl = observation.SourceUrl, AlreadyOpened = observation.AlreadyOpened };
             context.Add(new(turn.Output, call.Id, observation));
             if (context.Sum(step => step.ModelOutput.Sum(item => item.GetRawText().Length) + step.Observation.Data.Length) > 220_000)
                 throw new InvalidDataException("Контекст задачи слишком большой. Задача остановлена.");

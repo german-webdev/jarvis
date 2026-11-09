@@ -26,7 +26,7 @@ public sealed class AiService : IDisposable
 
     public AiService(string root, HttpClient? http = null)
     {
-        OpenBrowserTools = (progress, token) => PlaywrightBrowserTools.StartAsync(root, progress, token);
+        OpenBrowserTools = (progress, token) => PlaywrightBrowserTools.StartAsync(root, progress, token, ChromeConnection());
         _http = http ?? new(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(100) };
         Store = new(Path.Combine(root, "data", "ai-connections.json"));
         (Configuration, LoadWarning) = Store.Load();
@@ -35,6 +35,15 @@ public sealed class AiService : IDisposable
         ChatGpt = new(Path.Combine(root, "data", "chatgpt-accounts"), ChatGptClient);
         ChatGpt.AccountChanging += OnAccountChanging;
         Subscriptions.AccountChanging += OnAccountChanging;
+    }
+
+    private ChromeBrowserConnection? ChromeConnection()
+    {
+        var protectedToken = Configuration.ProtectedChromeToken;
+        if (protectedToken.Length == 0) return null;
+        try { return new(ChromeBrowserConnection.NormalizeToken(Unprotect(protectedToken))); }
+        catch (Exception error) when (error is CryptographicException or FormatException or InvalidDataException)
+        { throw new InvalidDataException("Проверь код подключения Chrome."); }
     }
 
     private void OnAccountChanging(AiConnection connection)
@@ -58,6 +67,7 @@ public sealed class AiService : IDisposable
         {
             var changed = ConnectionScope(Configuration.Active) != ConnectionScope(settings.Active)
                 || Configuration.AllowLocalActions != settings.AllowLocalActions
+                || Configuration.ProtectedChromeToken != settings.ProtectedChromeToken
                 || (_browserToolsPending && Configuration.UseForUnknownCommands != settings.UseForUnknownCommands);
             Store.Save(settings); Configuration = settings;
             if (changed) InvalidateConnection();
@@ -89,6 +99,7 @@ public sealed class AiService : IDisposable
         bool useBrowserTools = false, bool needsObservation = false, Action<string>? browserProgress = null)
     {
         var channelRequest = useBrowserTools && AiRouting.RequestsChannelPage(question);
+        var channelVideoRequest = channelRequest && AiRouting.RequestsChannelVideo(question);
         needsObservation |= channelRequest;
         var revisionAtStart = ConnectionRevision;
         Task<SkillResult> request;
@@ -138,7 +149,7 @@ public sealed class AiService : IDisposable
                         {
                             IAiToolSession? browser = null;
                             try { browser = await OpenBrowserTools(browserProgress, cancellation); }
-                            catch (InvalidDataException) when (!needsObservation) { }
+                            catch (InvalidDataException) when (!needsObservation && Configuration.ProtectedChromeToken.Length == 0) { }
                             if (browser != null)
                             {
                                 await using var session = browser;
@@ -159,14 +170,16 @@ public sealed class AiService : IDisposable
                 timeout.Token.ThrowIfCancellationRequested();
                 if (revisionAtStart != ConnectionRevision) throw new OperationCanceledException();
                 if (channelRequest && result.Verified && result.SourceUrl == null)
-                    return new(false, "Не удалось подтвердить страницу канала.");
+                    return new(false, channelVideoRequest ? "Не удалось подтвердить видео канала." : "Не удалось подтвердить страницу канала.");
                 if (useBrowserTools && result.Verified && result.SourceUrl is { } source)
                 {
                     if (!PlaywrightBrowserTools.TryPublicPage(source, out var address))
                         return new(false, "Адрес страницы не подтверждён.");
-                    if (channelRequest && address.Host == "www.youtube.com" && !PlaywrightBrowserTools.IsChannelPage(address))
+                    if (channelVideoRequest && address.Host == "www.youtube.com" && !PlaywrightBrowserTools.IsVideoWatch(address))
+                        return new(false, "Не удалось подтвердить видео канала.");
+                    if (channelRequest && !channelVideoRequest && address.Host == "www.youtube.com" && !PlaywrightBrowserTools.IsChannelPage(address))
                         return new(false, "Не удалось подтвердить нужный канал YouTube.");
-                    try { OpenBrowserPage(address, timeout.Token); }
+                    try { if (!result.AlreadyOpened) OpenBrowserPage(address, timeout.Token); }
                     catch (Exception error) when (error is System.ComponentModel.Win32Exception or InvalidOperationException)
                     { return new(false, "Не удалось открыть страницу в браузере по умолчанию."); }
                     return result with { Message = "Выполнено." };

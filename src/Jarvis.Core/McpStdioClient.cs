@@ -12,12 +12,17 @@ public sealed class McpStdioClient : IAsyncDisposable
     private const string Protocol = "2025-06-18";
     private const int MaxMessageLength = 4_000_000;
     private readonly Process _process;
+    private readonly bool _ownsChildProcesses;
     private readonly char[] _buffer = new char[4096];
     private int _position, _available, _nextId;
 
-    private McpStdioClient(Process process) => _process = process;
+    private McpStdioClient(Process process, bool ownsChildProcesses)
+    {
+        _process = process;
+        _ownsChildProcesses = ownsChildProcesses;
+    }
 
-    public static async Task<McpStdioClient> StartAsync(ProcessStartInfo start, CancellationToken token)
+    public static async Task<McpStdioClient> StartAsync(ProcessStartInfo start, CancellationToken token, bool ownsChildProcesses = true)
     {
         token.ThrowIfCancellationRequested();
         start.UseShellExecute = false;
@@ -25,7 +30,7 @@ public sealed class McpStdioClient : IAsyncDisposable
         start.StandardInputEncoding = start.StandardOutputEncoding = new UTF8Encoding(false);
         start.CreateNoWindow = true;
         var process = Process.Start(start) ?? throw new IOException("MCP process did not start.");
-        var client = new McpStdioClient(process);
+        var client = new McpStdioClient(process, ownsChildProcesses);
         try
         {
             process.BeginErrorReadLine();
@@ -93,8 +98,8 @@ public sealed class McpStdioClient : IAsyncDisposable
         }
         catch (OperationCanceledException) when (stop.IsCancellationRequested)
         {
-            // The session is abandoned after cancellation; terminate the browser and MCP as one tree.
-            KillTree();
+            // An attached browser belongs to the user. Only terminate the relay in that mode.
+            StopProcess();
             token.ThrowIfCancellationRequested();
             throw new TimeoutException("MCP request timed out.");
         }
@@ -131,21 +136,29 @@ public sealed class McpStdioClient : IAsyncDisposable
         }
     }
 
-    private void KillTree()
+    private void StopProcess()
     {
-        try { if (!_process.HasExited) _process.Kill(entireProcessTree: true); }
+        try { if (!_process.HasExited) _process.Kill(entireProcessTree: _ownsChildProcesses); }
         catch (Exception error) when (error is InvalidOperationException or System.ComponentModel.Win32Exception) { }
     }
 
     public async ValueTask DisposeAsync()
     {
+        if (!_ownsChildProcesses)
+        {
+            // The relay's graceful shutdown can send Browser.close to the attached Chrome.
+            StopProcess();
+            _process.Dispose();
+            return;
+        }
+
         using var grace = new CancellationTokenSource(TimeSpan.FromSeconds(2));
         try
         {
             _process.StandardInput.Close();
             await _process.WaitForExitAsync(grace.Token).ConfigureAwait(false);
         }
-        catch (Exception error) when (error is IOException or InvalidOperationException or OperationCanceledException) { KillTree(); }
+        catch (Exception error) when (error is IOException or InvalidOperationException or OperationCanceledException) { StopProcess(); }
         finally { _process.Dispose(); }
     }
 }

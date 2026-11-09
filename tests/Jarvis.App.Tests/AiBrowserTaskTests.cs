@@ -158,6 +158,41 @@ public sealed class AiBrowserTaskTests
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CombinedChannelCommandFinishesOnTheVideo(bool videoOpened)
+    {
+        using var root = new TestProfile();
+        var browser = new Browser(true, alreadyOpened: true);
+        var requests = 0;
+        using var ai = new AiService(root.Path, new HttpClient(new Handler(_ => Task.FromResult(++requests switch
+        {
+            1 => Call(Channel),
+            2 when videoOpened => Call(Watch, "video_fixture"),
+            _ => Show()
+        }))));
+        Configure(ai, root.Path);
+        ai.OpenBrowserTools = (_, _) => Task.FromResult<IAiToolSession>(browser);
+        ai.OpenBrowserPage = (_, _) => throw new Xunit.Sdk.XunitException("Chrome is already displaying the result.");
+        var result = await ai.RunBrowserRequestAsync("Открой канал шаморошоу и запусти последнее актуальное видео.", true, null, CancellationToken.None);
+        Assert.Equal(videoOpened, result.Verified);
+        Assert.Equal(videoOpened ? Watch : null, result.SourceUrl);
+    }
+
+    [Fact]
+    public void ChromeAcceptsTheCopiedExtensionValueWithoutStoringItInClearText()
+    {
+        using var root = new TestProfile();
+        using var ai = new AiService(root.Path);
+        var token = new string('A', 43);
+        var value = ChromeBrowserConnection.NormalizeToken("PLAYWRIGHT_MCP_EXTENSION_TOKEN=" + token);
+        ai.Save(ai.Configuration with { ProtectedChromeToken = AiService.Protect(value) });
+        Assert.DoesNotContain(token, File.ReadAllText(Path.Combine(root.Path, "data", "ai-connections.json")));
+        Assert.Equal(token, AiService.Unprotect(ai.Configuration.ProtectedChromeToken));
+        Assert.Throws<InvalidDataException>(() => ChromeBrowserConnection.NormalizeToken("bad value"));
+    }
+
+    [Theory]
     [InlineData("stop")]
     [InlineData("disable")]
     public async Task LateModelOutputCannotStartBrowserAction(string reason)
@@ -348,6 +383,28 @@ public sealed class AiBrowserTaskTests
     }
 
     [Fact]
+    public void ChannelUploadsReturnVideoLinksInPageOrder()
+    {
+        var uploads = Channel + "/videos";
+        var result = PlaywrightBrowserTools.Observe(new Uri(uploads), $"""
+            ### Page
+            - Page URL: {uploads}
+            - Page Title: Fixture - YouTube
+            ### Snapshot
+            - heading "Fixture, verified" [level=1] [ref=e3]:
+              - generic [ref=e4]: Fixture
+              - generic [ref=e5]: "@FixtureChannel"
+            - link "Newest" [ref=e6]:
+              - /url: /watch?v=abcdefghijk
+            - link "Older" [ref=e7]:
+              - /url: /watch?v=12345678901
+            """);
+        Assert.True(result.Verified);
+        using var data = JsonDocument.Parse(result.Data);
+        Assert.Equal(Watch, data.RootElement.GetProperty("videos")[0].GetProperty("url").GetString());
+    }
+
+    [Fact]
     public void OptionalCookieRejectionOnlyMatchesTheExpectedChannel()
     {
         var redirect = Uri.EscapeDataString(Channel + "?cbrd=1");
@@ -388,7 +445,7 @@ public sealed class AiBrowserTaskTests
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token) => send(request);
     }
 
-    private sealed class Browser(bool verified) : IAiToolSession
+    private sealed class Browser(bool verified, bool alreadyOpened = false) : IAiToolSession
     {
         private string? _current;
         public int Calls { get; private set; }
@@ -398,7 +455,7 @@ public sealed class AiBrowserTaskTests
             new("browser_show", "Show a page", JsonSerializer.SerializeToElement(new { type = "object" }))];
         public Task<AiToolObservation> InvokeAsync(string name, JsonElement arguments, CancellationToken token)
         {
-            if (name == "browser_show") return Task.FromResult(new AiToolObservation(true, "", "Выполнено.", _current, Complete: true));
+            if (name == "browser_show") return Task.FromResult(new AiToolObservation(true, "", "Выполнено.", _current, Complete: true, AlreadyOpened: alreadyOpened));
             Assert.Equal("browser_navigate", name);
             var address = arguments.GetProperty("url").GetString();
             Assert.True(address is Url or Watch or Channel);

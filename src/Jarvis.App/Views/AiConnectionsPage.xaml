@@ -12,7 +12,16 @@
       <DockPanel><TextBlock Text="{DynamicResource Ui545E374E8BD4}" VerticalAlignment="Center" Margin="0,0,14,0"/><ComboBox x:Name="ActiveBox" DisplayMemberPath="Name" SelectedValuePath="Id" Padding="7"/></DockPanel>
       <CheckBox x:Name="FallbackBox" Content="{DynamicResource Ui4A5C123F3A8B}" Foreground="{DynamicResource ThemeText}" Margin="0,10,0,0"/>
       <CheckBox x:Name="ActionsBox" Foreground="{DynamicResource ThemeText}" Margin="0,10,0,0"/>
-
+      <CheckBox x:Name="ChromeBox" Foreground="{DynamicResource ThemeText}" Margin="0,10,0,0"/>
+      <StackPanel Margin="20,7,0,0">
+        <StackPanel.Style><Style TargetType="StackPanel"><Setter Property="Visibility" Value="Collapsed"/>
+          <Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=ChromeBox}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+        </Style></StackPanel.Style>
+        <WrapPanel><Button x:Name="ChromeInstallButton" Click="ChromeInstallClick" Padding="10,6"/>
+          <Button x:Name="ChromeStatusButton" Click="ChromeStatusClick" Padding="10,6"/></WrapPanel>
+        <TextBlock x:Name="ChromeHint" Style="{StaticResource Hint}"/>
+        <PasswordBox x:Name="ChromeCodeBox" Margin="0,6,0,0" MaxWidth="500" HorizontalAlignment="Stretch" MaxLength="256" Padding="8"/>
+      </StackPanel>
     </StackPanel>
     <Grid Grid.Row="2"><Grid.ColumnDefinitions><ColumnDefinition Width="240"/><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
       <DockPanel><WrapPanel x:Name="ManageButtons" DockPanel.Dock="Bottom" Margin="0,12,0,0"><Button Content="{DynamicResource Ui71038C53BBC4}" Click="AddClick" Padding="12,9"/><Button Content="{DynamicResource UiBE99B1361201}" Click="RemoveClick" Padding="12,9" Margin="0"/></WrapPanel><ListBox x:Name="ConnectionsList" DisplayMemberPath="Name" SelectionChanged="SelectionChanged" Background="{DynamicResource ThemeSurface}" Foreground="{DynamicResource ThemeText}" BorderThickness="0" Padding="8"/></DockPanel>

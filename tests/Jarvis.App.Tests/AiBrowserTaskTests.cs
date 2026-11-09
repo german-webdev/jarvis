@@ -211,7 +211,7 @@ public sealed class AiBrowserTaskTests
     }
 
     [Fact]
-    public async Task StoppingAStalledMcpCallClosesTheProcess()
+    public async Task McpSessionRecoversFromOversizeAndStopsAStalledCall()
     {
         const string server = """
             while ($line = [Console]::ReadLine()) {
@@ -221,6 +221,10 @@ public sealed class AiBrowserTaskTests
                 } elseif ($msg.method -eq 'tools/list') {
                     $result = @{ tools = @(@{ name = 'fixture'; processId = $PID }) }
                 } elseif ($msg.method -eq 'tools/call') {
+                    if ($msg.params.name -eq 'oversized') {
+                        [Console]::WriteLine('{"jsonrpc":"2.0","id":' + $msg.id + ',"result":{"payload":"' + ('x' * 4000200) + '"}}')
+                        continue
+                    }
                     Start-Sleep -Seconds 20
                     break
                 } else { continue }
@@ -234,6 +238,8 @@ public sealed class AiBrowserTaskTests
         await using var client = await McpStdioClient.StartAsync(start, testDeadline.Token);
         var tools = await client.ListToolsAsync(testDeadline.Token);
         using var serverProcess = Process.GetProcessById(Assert.Single(tools).GetProperty("processId").GetInt32());
+        await Assert.ThrowsAsync<McpResponseTooLargeException>(() => client.CallAsync("oversized", JsonSerializer.SerializeToElement(new { }), testDeadline.Token));
+        Assert.Single(await client.ListToolsAsync(testDeadline.Token));
         using var stop = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
         var pending = client.CallAsync("fixture", JsonSerializer.SerializeToElement(new { }), stop.Token);
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending.WaitAsync(TimeSpan.FromSeconds(3)));

@@ -645,6 +645,7 @@
   "Не удалось подтвердить страницу канала.": "The channel page could not be verified.",
   "Нужен адрес общедоступной страницы.": "A public web page address is required.",
   "Сайт вернул ошибку HTTP {0}.": "The site returned HTTP error {0}.",
+  "Страница слишком большая для чтения целиком.": "The page is too large to read all at once.",
   "Браузер не ответил вовремя. Повтори запрос.": "The browser didn't respond in time. Try again.",
   "Сайт перенаправил браузер или не показал ожидаемую страницу.": "The site redirected the browser or didn't show the expected page.",
   "Браузерное действие не подтверждено.": "The browser action wasn't verified.",

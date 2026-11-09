@@ -4,11 +4,13 @@ using System.Text.Json;
 
 namespace Jarvis.Core;
 
+public sealed class McpResponseTooLargeException() : IOException("MCP response is too large.") { }
+
 /// <summary>One private, sequential MCP session over newline-delimited JSON-RPC.</summary>
 public sealed class McpStdioClient : IAsyncDisposable
 {
     private const string Protocol = "2025-06-18";
-    private const int MaxMessageLength = 1_000_000;
+    private const int MaxMessageLength = 4_000_000;
     private readonly Process _process;
     private readonly char[] _buffer = new char[4096];
     private int _position, _available, _nextId;
@@ -108,6 +110,7 @@ public sealed class McpStdioClient : IAsyncDisposable
     private async Task<string> ReadMessageAsync(CancellationToken token)
     {
         var message = new StringBuilder();
+        var oversized = false;
         while (true)
         {
             if (_position == _available)
@@ -118,10 +121,13 @@ public sealed class McpStdioClient : IAsyncDisposable
             }
             var newline = Array.IndexOf(_buffer, '\n', _position, _available - _position);
             var end = newline < 0 ? _available : newline;
-            if (message.Length + end - _position > MaxMessageLength) throw new InvalidDataException("MCP response is too large.");
-            message.Append(_buffer, _position, end - _position);
+            oversized |= message.Length + end - _position > MaxMessageLength;
+            if (!oversized) message.Append(_buffer, _position, end - _position);
             _position = newline < 0 ? end : end + 1;
-            if (newline >= 0) return message.ToString();
+            if (newline < 0) continue;
+            // Consume the entire line so the next request can still read its own reply.
+            if (oversized) throw new McpResponseTooLargeException();
+            return message.ToString();
         }
     }
 

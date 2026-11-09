@@ -28,6 +28,10 @@ internal sealed partial class PlaywrightBrowserTools(McpStdioClient client, Dire
         JsonSerializer.SerializeToElement(new { type = "object", properties = new { url = new { type = "string" } },
             required = new[] { "url" }, additionalProperties = false }));
     private static readonly JsonElement NoParameters = JsonSerializer.SerializeToElement(new { type = "object", properties = new { }, additionalProperties = false });
+    private static readonly JsonElement SnapshotParameters = JsonSerializer.SerializeToElement(new { type = "object", properties = new {
+        target = new { type = "string", description = "Element reference to read just that part of the page." },
+        depth = new { type = "integer", minimum = 1, maximum = 50, description = "Optional depth limit for a very large page." }
+    }, additionalProperties = false });
     private static readonly string[] BrowserActions = [Click, "browser_hover", "browser_type", "browser_press_key", "browser_tabs",
         "browser_navigate_back", "browser_select_option", "browser_fill_form", "browser_drag", "browser_handle_dialog", "browser_wait_for"];
     private string? _currentPage;
@@ -65,7 +69,7 @@ internal sealed partial class PlaywrightBrowserTools(McpStdioClient client, Dire
             var available = (await client.ListToolsAsync(token)).ToDictionary(tool => tool.GetProperty("name").GetString()!, StringComparer.Ordinal);
             if (!available.ContainsKey(Navigate) || !available.ContainsKey(Snapshot) || !available.ContainsKey(Click)) throw new InvalidDataException(Unavailable);
             List<AiToolDefinition> definitions = [ReadPage,
-                new(Snapshot, "Read the current browser page and element references without changing it.", NoParameters),
+                new(Snapshot, "Read the current browser page and element references without changing it. Use a target or depth on very large pages.", SnapshotParameters),
                 new(Show, "Finish and open the current verified page in the user's default browser. Use for requests to open or show a page.", NoParameters)];
             foreach (var name in BrowserActions)
                 if (available.TryGetValue(name, out var definition))
@@ -105,7 +109,11 @@ internal sealed partial class PlaywrightBrowserTools(McpStdioClient client, Dire
         }
         else if (name == Snapshot)
         {
-            if (fields.Length != 0) return Error("Браузерное действие недоступно.");
+            if (fields.Any(field => field.Name switch {
+                "target" => field.Value.ValueKind != JsonValueKind.String,
+                "depth" => field.Value.ValueKind != JsonValueKind.Number || !field.Value.TryGetInt32(out var depth) || depth is < 1 or > 50,
+                _ => true
+            })) return Error("Браузерное действие недоступно.");
         }
         else if (!BrowserActions.Contains(name, StringComparer.Ordinal)) return Error("Браузерное действие недоступно.");
         else if (name == "browser_tabs" && arguments.TryGetProperty("url", out var url)
@@ -128,7 +136,7 @@ internal sealed partial class PlaywrightBrowserTools(McpStdioClient client, Dire
             for (var attempt = 0; attempt < (search || watch || channel ? 5 : 1); attempt++)
             {
                 if (attempt > 0) await Task.Delay(600, token);
-                var result = await client.CallAsync(Snapshot, Empty, token);
+                var result = await client.CallAsync(Snapshot, name == Snapshot ? arguments : Empty, token);
                 if (Failed(result)) return new(false, TrimObservation(ReadText(result), 1700), NavigationError);
                 var text = ReadText(result);
                 if (channel && !rejectedCookies && TryGetConsentReject(requested!, text, out var target))
@@ -150,6 +158,8 @@ internal sealed partial class PlaywrightBrowserTools(McpStdioClient client, Dire
             return Error(channel ? NoChannel : watch ? NoVideo : NoResults);
         }
         catch (TimeoutException) { return Error("Браузер не ответил вовремя. Повтори запрос."); }
+        catch (McpResponseTooLargeException)
+        { return new(false, "The snapshot is too large. Call browser_snapshot with a smaller depth or a specific target.", "Страница слишком большая для чтения целиком."); }
         catch (Exception error) when (error is IOException or InvalidDataException or JsonException or InvalidOperationException or KeyNotFoundException)
         { return Error(NavigationError); }
     }

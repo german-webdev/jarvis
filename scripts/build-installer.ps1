@@ -33,7 +33,7 @@ if(-not (Get-Content -LiteralPath $report -Raw | ConvertFrom-Json).success){thro
 & (Join-Path $PSScriptRoot 'clear-release.ps1')
 & $InnoCompiler ('/DPayloadDir='+$payload) ('/DReleaseDir='+$release) installer/Jarvis.iss
 if($LASTEXITCODE -ne 0){throw 'Installer compilation failed'}
-$file=Join-Path $release 'JARVIS-Setup-0.15.1-win-x64.exe'
+$file=Join-Path $release 'JARVIS-Setup-0.16.0-win-x64.exe'
 $hash=(Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()
 [IO.File]::WriteAllText($file+'.sha256', $hash+'  '+[IO.Path]::GetFileName($file)+[Environment]::NewLine)
 Copy-Item -LiteralPath (Join-Path $repoRoot 'installer\README-RU.txt') -Destination (Join-Path $release 'README-RU.txt') -Force

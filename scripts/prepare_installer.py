@@ -17,7 +17,7 @@ import certifi
 from python_utf8_manifest import enable_utf8
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "0.15.0"
+VERSION = "0.15.1"
 NODE_RELEASE = "v22.22.3"
 NODE_SHA256 = "6c8d54f635feff4df76c2ca80f45332eb2ff57d25226edce36592e51a177ee33"
 

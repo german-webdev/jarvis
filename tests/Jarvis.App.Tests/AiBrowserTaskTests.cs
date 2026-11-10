@@ -18,6 +18,20 @@ public sealed class AiBrowserTaskTests
     private const string Channel = "https://www.youtube.com/@FixtureChannel";
 
     [Theory]
+    [InlineData("chrome.exe", "chrome")]
+    [InlineData("msedge.exe", "msedge")]
+    [InlineData("opera.exe", "chromium")]
+    [InlineData("browser.exe", "chromium")]
+    public void ExtensionUsesTheSelectedBrowser(string executable, string expected) =>
+        Assert.Equal(expected, ChromeBrowserConnection.ChannelFor(executable));
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("firefox.exe")]
+    public void IncompatibleExtensionBrowserReportsTheProblem(string? executable) =>
+        Assert.Throws<InvalidDataException>(() => ChromeBrowserConnection.ChannelFor(executable));
+
+    [Theory]
     [InlineData(true)]
     [InlineData(false)]
     public async Task ModelReceivesTheObservationAndCannotOverrideIt(bool verified)

@@ -56,7 +56,7 @@ public sealed record AiConfiguration
             throw new InvalidDataException("Проверь список подключений: не более 30, без повторов.");
         foreach (var connection in Connections) connection.Validate();
         if (ProtectedChromeToken.Length > 2048 || ProtectedChromeToken.Any(char.IsWhiteSpace))
-            throw new InvalidDataException("Проверь код подключения Chrome.");
+            throw new InvalidDataException("Проверь код подключения браузера.");
         if (Enabled && Active == null) throw new InvalidDataException("Выбери подключение для ответов нейросети.");
     }
 }

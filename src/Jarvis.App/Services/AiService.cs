@@ -43,7 +43,7 @@ public sealed class AiService : IDisposable
         if (protectedToken.Length == 0) return null;
         try { return new(ChromeBrowserConnection.NormalizeToken(Unprotect(protectedToken))); }
         catch (Exception error) when (error is CryptographicException or FormatException or InvalidDataException)
-        { throw new InvalidDataException("Проверь код подключения Chrome."); }
+        { throw new InvalidDataException("Проверь код подключения браузера."); }
     }
 
     private void OnAccountChanging(AiConnection connection)

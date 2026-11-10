@@ -62,7 +62,7 @@ internal sealed partial class PlaywrightBrowserTools(McpStdioClient client, Dire
             if (chrome != null)
             {
                 start.ArgumentList.Add("--extension");
-                start.ArgumentList.Add("--browser=chrome");
+                start.ArgumentList.Add("--browser=" + chrome.Channel);
                 start.Environment["PLAYWRIGHT_MCP_EXTENSION_TOKEN"] = chrome.Token;
                 if (chrome.ExecutablePath != null) start.ArgumentList.Add("--executable-path=" + chrome.ExecutablePath);
                 if (chrome.UserDataDirectory != null) start.ArgumentList.Add("--user-data-dir=" + chrome.UserDataDirectory);

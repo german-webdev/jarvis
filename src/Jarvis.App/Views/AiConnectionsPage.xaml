@@ -12,7 +12,15 @@
       <DockPanel><TextBlock Text="{DynamicResource Ui545E374E8BD4}" VerticalAlignment="Center" Margin="0,0,14,0"/><ComboBox x:Name="ActiveBox" DisplayMemberPath="Name" SelectedValuePath="Id" Padding="7"/></DockPanel>
       <CheckBox x:Name="FallbackBox" Content="{DynamicResource Ui4A5C123F3A8B}" Foreground="{DynamicResource ThemeText}" Margin="0,10,0,0"/>
       <CheckBox x:Name="ActionsBox" Foreground="{DynamicResource ThemeText}" Margin="0,10,0,0"/>
-      <CheckBox x:Name="ChromeBox" Foreground="{DynamicResource ThemeText}" Margin="0,10,0,0"/>
+      <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+        <CheckBox x:Name="ChromeBox" Foreground="{DynamicResource ThemeText}" VerticalAlignment="Center"/>
+        <Button x:Name="BrowserHelpButton" Content="?" Click="BrowserHelpClick" Width="26" Height="26"
+                Padding="0" Margin="8,0,0,0" FontWeight="SemiBold" ToolTipService.ShowDuration="30000">
+          <Button.ToolTip><ToolTip x:Name="BrowserHelpTip" MaxWidth="380" Placement="Bottom" StaysOpen="False">
+            <TextBlock x:Name="BrowserHelpText" TextWrapping="Wrap"/>
+          </ToolTip></Button.ToolTip>
+        </Button>
+      </StackPanel>
       <StackPanel Margin="20,7,0,0">
         <StackPanel.Style><Style TargetType="StackPanel"><Setter Property="Visibility" Value="Collapsed"/>
           <Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=ChromeBox}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>

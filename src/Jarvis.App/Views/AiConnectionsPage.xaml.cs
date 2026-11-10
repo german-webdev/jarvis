@@ -30,10 +30,13 @@ public partial class AiConnectionsPage : WorkspacePage
         ActionsBox.Content = Ui.Text("Разрешить ИИ запускать приложения");
         ActionsBox.ToolTip = Ui.Text("Общее разрешение для выбранной нейросети. Запуск приложений из каталога и переключение на их окна.");
         ChromeBox.IsChecked = service.Configuration.ProtectedChromeToken.Length > 0;
-        ChromeBox.Content = Ui.Text("Работать в моём Chrome");
+        ChromeBox.Content = Ui.Text("Работать в моём браузере");
+        BrowserHelpText.Text = Ui.Text("Работа в текущем профиле браузера на базе Chromium через расширение Playwright. JARVIS использует браузер по умолчанию с твоими входами на сайты. Установи расширение в нужном профиле и сохрани его код в JARVIS. При смене браузера или профиля сохрани новый код. Нейросеть читает страницы вкладок, доступных расширению.");
+        System.Windows.Automation.AutomationProperties.SetName(BrowserHelpButton, Ui.Text("Справка о работе в моём браузере"));
+
         ChromeInstallButton.Content = Ui.Text("Установить расширение Playwright");
         ChromeStatusButton.Content = Ui.Text("Открыть страницу кода");
-        System.Windows.Automation.AutomationProperties.SetName(ChromeCodeBox, Ui.Text("Код подключения Chrome"));
+        System.Windows.Automation.AutomationProperties.SetName(ChromeCodeBox, Ui.Text("Код подключения браузера"));
         UpdateChromeHint();
         StatusText.Text = Ui.Text(service.LoadWarning ?? "");
 
@@ -178,13 +181,19 @@ public partial class AiConnectionsPage : WorkspacePage
         ? "Скопируй код со страницы расширения и вставь его ниже. Выбранная нейросеть читает содержимое страниц рабочей вкладки."
         : "Код сохранён. Поле нужно только для замены кода.");
 
+    private void BrowserHelpClick(object sender, RoutedEventArgs e)
+    {
+        BrowserHelpTip.PlacementTarget = BrowserHelpButton;
+        BrowserHelpTip.IsOpen = !BrowserHelpTip.IsOpen;
+    }
+
     private void ChromeInstallClick(object sender, RoutedEventArgs e) => OpenChromeSetup(ChromeBrowserConnection.StorePage);
     private void ChromeStatusClick(object sender, RoutedEventArgs e) => OpenChromeSetup(ChromeBrowserConnection.StatusPage);
 
     private void OpenChromeSetup(Uri address)
     {
         try { ChromeBrowserConnection.OpenSetupPage(address); }
-        catch (Exception error) { StatusText.Text = Ui.Text(error is InvalidDataException ? error.Message : "Не удалось открыть Chrome."); }
+        catch (Exception error) { StatusText.Text = Ui.Text(error is InvalidDataException ? error.Message : "Не удалось открыть браузер."); }
     }
 
     private async Task OperateAsync(Func<AiConnection, CancellationToken, Task<string>> operation, bool requireSaved = false)

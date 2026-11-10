@@ -1,4 +1,12 @@
 {
+  "Работать в моём браузере": "Use my browser",
+  "Код подключения браузера": "Browser connection code",
+  "Справка о работе в моём браузере": "Help with using my browser",
+  "Не удалось открыть браузер.": "Could not open the browser.",
+  "Проверь код подключения браузера.": "Check the browser connection code.",
+  "Этот браузер не поддерживает подключение через расширение Playwright для Chromium.": "This browser does not support connecting through Playwright Extension for Chromium.",
+  "Не удалось подключиться к браузеру. Проверь расширение Playwright и код подключения в «Подключениях ИИ».": "Could not connect to the browser. Check Playwright Extension and the connection code in AI connections.",
+  "Работа в текущем профиле браузера на базе Chromium через расширение Playwright. JARVIS использует браузер по умолчанию с твоими входами на сайты. Установи расширение в нужном профиле и сохрани его код в JARVIS. При смене браузера или профиля сохрани новый код. Нейросеть читает страницы вкладок, доступных расширению.": "Work in your current Chromium-based browser profile through Playwright Extension. JARVIS uses your default browser with your website sign-ins. Install the extension in the profile you use and save its code in JARVIS. Save a new code when changing browser or profile. The AI reads pages in tabs available to the extension.",
   "Разрешить ИИ запускать приложения": "Allow AI to launch applications",
   "Общее разрешение для выбранной нейросети. Запуск приложений из каталога и переключение на их окна.": "Shared permission for the selected AI. Launch catalog applications and focus their windows.",
   "Приложения и игры · JARVIS": "Apps and games · JARVIS",

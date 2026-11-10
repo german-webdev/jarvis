@@ -15,7 +15,7 @@ public sealed record AiConnection
     [System.Text.Json.Serialization.JsonIgnore]
     public bool IsSubscription => Provider is "chatgpt" or "claude";
     [System.Text.Json.Serialization.JsonIgnore]
-    public bool SupportsBrowserTools => Provider == "chatgpt";
+    public bool SupportsBrowserTools => Provider is "chatgpt" or "claude" or "api" or "ollama";
 
     public void Validate()
     {

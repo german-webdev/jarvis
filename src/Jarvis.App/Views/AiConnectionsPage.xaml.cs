@@ -27,8 +27,8 @@ public partial class AiConnectionsPage : WorkspacePage
         EnabledBox.IsChecked = service.Configuration.Enabled; FallbackBox.IsChecked = service.Configuration.UseForUnknownCommands;
         FallbackBox.ToolTip = Ui.Text("С ChatGPT это также включает работу с общедоступными сайтами.");
         ActionsBox.IsChecked = service.Configuration.AllowLocalActions;
-        ActionsBox.Content = Ui.Text("Разрешить локальные задачи ИИ (ChatGPT)");
-        ActionsBox.ToolTip = Ui.Text("«Задача ИИ: открой [приложение], затем переключись на него». Только включённые EXE из каталога. До трёх действий.");
+        ActionsBox.Content = Ui.Text("Разрешить ИИ запускать приложения");
+        ActionsBox.ToolTip = Ui.Text("Общее разрешение для выбранной нейросети. Запуск приложений из каталога и переключение на их окна.");
         ChromeBox.IsChecked = service.Configuration.ProtectedChromeToken.Length > 0;
         ChromeBox.Content = Ui.Text("Работать в моём Chrome");
         ChromeInstallButton.Content = Ui.Text("Установить расширение Playwright");

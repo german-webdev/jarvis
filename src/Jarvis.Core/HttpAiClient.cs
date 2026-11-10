@@ -25,10 +25,15 @@ public sealed class HttpAiClient(HttpClient client)
     {
         if (string.IsNullOrWhiteSpace(connection.Model)) throw new InvalidDataException("Выбери модель в настройках нейросети.");
         AiRequest.ValidateInput(conversation);
-        var messages = new[] { new AiMessage("system", SystemPrompt) }.Concat(conversation).ToArray();
+        return CleanAnswer(await CompleteAsync(connection, key, SystemPrompt, conversation, token));
+    }
+
+    public async Task<string> CompleteAsync(AiConnection connection, string key, string instructions, IReadOnlyList<AiMessage> conversation, CancellationToken token)
+    {
+        var messages = new[] { new AiMessage("system", instructions) }.Concat(conversation).ToArray();
         object body = connection.Provider == "ollama"
-            ? new { model = connection.Model, messages, stream = false, options = new { num_predict = 512 } }
-            : new { model = connection.Model, messages, stream = false, max_tokens = 512 };
+            ? new { model = connection.Model, messages, stream = false, options = new { num_predict = 2048 } }
+            : new { model = connection.Model, messages, stream = false, max_tokens = 2048 };
         using var document = await SendAsync(connection, key, connection.Provider == "ollama" ? "api/chat" : "chat/completions", body, token);
         string? answer;
         try
@@ -39,7 +44,7 @@ public sealed class HttpAiClient(HttpClient client)
         }
         catch (Exception error) when (error is KeyNotFoundException or InvalidOperationException or IndexOutOfRangeException)
         { throw new InvalidDataException("Сервис не вернул текстовый ответ."); }
-        return CleanAnswer(answer);
+        return answer ?? throw new InvalidDataException("Нейросеть вернула пустой ответ.");
     }
 
     public static string CleanAnswer(string? answer)

@@ -123,6 +123,20 @@ public sealed class SubscriptionClient(string sessionRoot)
         return ReadAnswer(connection.Provider, result.Output);
     }
 
+    public async Task<string> CompleteToolTurnAsync(AiConnection connection, string instructions, string input, CancellationToken token)
+    {
+        var arguments = AnswerArguments(connection);
+        var index = Array.IndexOf(arguments, "--system-prompt");
+        if (index < 0) throw new InvalidDataException("Подключение не поддерживает этот протокол инструментов.");
+        arguments[index + 1] = instructions;
+        var result = await RunAsync(CreateStart(connection, arguments), input, token);
+        if (result.Code != 0) throw new InvalidDataException("Официальный клиент не вернул ответ с инструментами.");
+        using var data = JsonDocument.Parse(result.Output);
+        if (data.RootElement.TryGetProperty("is_error", out var error) && error.ValueKind == JsonValueKind.True)
+            throw new InvalidDataException("Официальный клиент сообщил об ошибке запроса.");
+        return data.RootElement.GetProperty("result").GetString() ?? "";
+    }
+
     public static string ReadAnswer(string provider, string output)
     {
         if (provider == "claude")

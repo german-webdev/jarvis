@@ -82,6 +82,8 @@ internal sealed partial class PlaywrightBrowserTools(McpStdioClient client, Dire
             var available = (await client.ListToolsAsync(token)).ToDictionary(tool => tool.GetProperty("name").GetString()!, StringComparer.Ordinal);
             if (!available.ContainsKey(Navigate) || !available.ContainsKey(Snapshot) || !available.ContainsKey(Click)) throw new InvalidDataException(Unavailable);
             List<AiToolDefinition> definitions = [ReadPage,
+                new("ask_user", "Ask a short clarification when the destination or required information is missing. Ends this request without opening a browser.",
+                    JsonSerializer.SerializeToElement(new { type = "object", properties = new { question = new { type = "string" } }, required = new[] { "question" }, additionalProperties = false })),
                 new(Snapshot, "Read the current browser page and element references without changing it. Use a target or depth on very large pages.", SnapshotParameters),
                 new(Show, "Finish and open the current verified page in the user's default browser. Use for requests to open or show a page.", NoParameters)];
             foreach (var name in BrowserActions)
@@ -109,6 +111,10 @@ internal sealed partial class PlaywrightBrowserTools(McpStdioClient client, Dire
         token.ThrowIfCancellationRequested();
         if (arguments.ValueKind != JsonValueKind.Object) return Error("Браузерное действие недоступно.");
         var fields = arguments.EnumerateObject().ToArray();
+        if (name == "ask_user")
+            return fields.Length == 1 && fields[0].Name == "question" && fields[0].Value.ValueKind == JsonValueKind.String
+                && fields[0].Value.GetString() is { Length: > 0 and <= 300 } question
+                ? new(false, "", question, Complete: true) : Error("Не удалось уточнить запрос.");
         if (name == Show)
             return fields.Length == 0 && _currentPage != null ? new(true, "", "Выполнено.", _currentPage, Complete: true, AlreadyOpened: chrome != null)
                 : Error("Адрес страницы не подтверждён.");
@@ -143,7 +149,13 @@ internal sealed partial class PlaywrightBrowserTools(McpStdioClient client, Dire
             {
                 var action = await client.CallAsync(name, arguments, token);
                 if (Failed(action)) return ToolError(action);
-                if (name == "browser_tabs") actionData = TrimObservation(ReadText(action), 2000);
+                if (name == "browser_tabs")
+                {
+                    actionData = TrimObservation(ReadText(action), 2000);
+                    if (arguments.TryGetProperty("action", out var tabAction) && tabAction.GetString() == "list")
+                        return new(true, actionData + "\nOnly session tabs are listed. Welcome is the extension connection page, not a navigation failure. " +
+                            "Navigate to a specified destination or use ask_user if the destination is unknown.", "");
+                }
             }
             var rejectedCookies = false;
             for (var attempt = 0; attempt < (search || watch || channel ? 5 : 1); attempt++)
@@ -199,6 +211,7 @@ internal sealed partial class PlaywrightBrowserTools(McpStdioClient client, Dire
 
     internal static AiToolObservation Observe(Uri? requested, string text)
     {
+        text = text.Replace("\r\n", "\n", StringComparison.Ordinal);
         var split = text.IndexOf("\n### Snapshot\n", StringComparison.Ordinal);
         if (split < 0) return Error(NavigationError);
         var headers = text[..split];

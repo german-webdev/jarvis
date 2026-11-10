@@ -30,7 +30,7 @@ public static class AiToolTask
             if (turn.Calls.Count == 0)
             {
                 if (observation is { Verified: false }) return new(false, observation.Display);
-                if (observation == null && needsObservation)
+                if (needsObservation)
                     return new(false, "Браузерное действие не подтверждено.");
                 return new(true, HttpAiClient.CleanAnswer(turn.Text));
             }

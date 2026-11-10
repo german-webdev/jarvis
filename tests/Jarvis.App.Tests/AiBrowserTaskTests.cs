@@ -214,7 +214,6 @@ public sealed class AiBrowserTaskTests
     }
 
     [Theory]
-    [InlineData("ollama", true, true)]
     [InlineData("chatgpt", false, true)]
     [InlineData("chatgpt", true, false)]
     public async Task DisabledOrUnsupportedBrowserRouteStartsNoProcessOrRequest(string provider, bool enabled, bool fallback)

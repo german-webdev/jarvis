@@ -1,4 +1,6 @@
 {
+  "Разрешить ИИ запускать приложения": "Allow AI to launch applications",
+  "Общее разрешение для выбранной нейросети. Запуск приложений из каталога и переключение на их окна.": "Shared permission for the selected AI. Launch catalog applications and focus their windows.",
   "Приложения и игры · JARVIS": "Apps and games · JARVIS",
   "Приложения и игры": "Apps and games",
   "Названия, сокращения и склонения добавляются автоматически. Свои варианты можно указать через запятую или точку с запятой.": "Names, abbreviations and inflected forms are added automatically. Separate custom names with commas or semicolons.",

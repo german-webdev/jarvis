@@ -98,9 +98,9 @@ public class AiLocalActionServiceTests
     }
 
     [Theory]
-    [InlineData("api", true)]
-    [InlineData("ollama", true)]
-    [InlineData("claude", true)]
+    [InlineData("api", false)]
+    [InlineData("ollama", false)]
+    [InlineData("claude", false)]
     [InlineData("chatgpt", false)]
     public async Task UnsupportedOrDisabledActionsNeverReadAccountOrSendRequest(string provider, bool allowed)
     {

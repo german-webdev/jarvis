@@ -47,7 +47,7 @@ internal static class BrowserVideoViewModelChecks
         public int Connects; public string? Query; public string? Opened; public TaskCompletionSource<BrowserVideoResult>? Pending;
         public bool Connected => Connects > 0;
         public Task ConnectAsync(CancellationToken token) { Connects++; return Task.CompletedTask; }
-        public static BrowserVideoResult Result() => new(true, "Выбери видео по номеру или в списке.", [new("abcdefghijk", "First", "A"), new("12345678901", "Second", "B")]);
+        public static BrowserVideoResult Result() => new(true, "Выберите видео по номеру или в списке.", [new("abcdefghijk", "First", "A"), new("12345678901", "Second", "B")]);
         public Task<BrowserVideoResult> SearchAsync(string query, CancellationToken token) { Query = query; return Pending?.Task ?? Task.FromResult(Result()); }
         public Task<BrowserVideoResult> OpenAsync(BrowserVideo video, CancellationToken token) { Opened = video.Id; return Task.FromResult(new BrowserVideoResult(true, "Страница видео открыта. Воспроизведение не проверено.", [], video.Url, video.Title)); }
         public void Stop() { }

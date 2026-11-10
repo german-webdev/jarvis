@@ -39,7 +39,7 @@ public static class BrowserLauncher
         token.ThrowIfCancellationRequested();
         var executable = GetDefaultExecutable();
         if (executable == null)
-            return new(false, "Не удалось определить браузер по умолчанию. Выбери браузер для HTTPS в Windows.");
+            return new(false, "Не удалось определить браузер по умолчанию. Выберите браузер для HTTPS в Windows.");
         var name = System.IO.Path.GetFileNameWithoutExtension(executable);
         using var process = Process.Start(new ProcessStartInfo(executable)
         {

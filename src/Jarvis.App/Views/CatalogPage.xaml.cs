@@ -56,7 +56,7 @@ public partial class CatalogPage : WorkspacePage
         var id = "file:" + file.ToLowerInvariant();
         if (_entries.Any(x => x.Target.Id == id)) { StatusText.Text = Ui.Text("Этот файл уже есть в каталоге."); return; }
         var target = new LaunchTarget(id, Path.GetFileNameWithoutExtension(file), Path.GetExtension(file).Equals(".lnk", StringComparison.OrdinalIgnoreCase) ? "shortcut" : "exe", file, "Добавлено вручную", [], true);
-        _entries.Add(new(target)); SearchBox.Clear(); StatusText.Text = Ui.Text("Добавлено. При желании укажи своё название и нажми «Сохранить».");
+        _entries.Add(new(target)); SearchBox.Clear(); StatusText.Text = Ui.Text("Добавлено. При желании укажите своё название и нажмите «Сохранить».");
     }
     private void SaveClick(object sender, RoutedEventArgs e)
     {

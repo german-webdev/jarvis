@@ -72,7 +72,7 @@ public sealed class WorkerClient : IWorkerClient
                     using var doc = JsonDocument.Parse(line);
                     Message?.Invoke(doc.RootElement.Clone());
                 }
-                if (!_disposed) Failed?.Invoke("Голосовой модуль завершился. Нажми «Перезапустить модуль».");
+                if (!_disposed) Failed?.Invoke("Голосовой модуль завершился. Нажмите «Перезапустить модуль».");
             }
             catch (Exception ex) { if (!_disposed) Failed?.Invoke(ex.Message); }
         });

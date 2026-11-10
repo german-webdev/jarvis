@@ -10,7 +10,7 @@ public sealed partial class ChatGptPlanClient
     public async Task<AiActionTurn> ToolTurnAsync(ChatGptAccount account, string model, IReadOnlyList<AiMessage> messages,
         IReadOnlyList<AiToolDefinition> tools, IReadOnlyList<AiToolExchange> continuation, CancellationToken token)
     {
-        if (string.IsNullOrWhiteSpace(model)) throw new InvalidDataException("Выбери модель в настройках нейросети.");
+        if (string.IsNullOrWhiteSpace(model)) throw new InvalidDataException("Выберите модель в настройках нейросети.");
         AiRequest.ValidateInput(messages);
         const string toolNamespace = "jarvis_tools";
         var input = messages.Select(message => JsonSerializer.SerializeToElement(message)).Concat(continuation.SelectMany(step =>
@@ -26,7 +26,7 @@ public sealed partial class ChatGptPlanClient
                     strict = false, parameters = tool.Parameters }).ToArray() } } });
         using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
         if (response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.UnprocessableEntity)
-            throw new InvalidDataException("ChatGPT отклонил запрос с браузерным инструментом. Проверь поддержку инструментов у выбранной модели.");
+            throw new InvalidDataException("ChatGPT отклонил запрос с браузерным инструментом. Проверьте поддержку инструментов у выбранной модели.");
         CheckStatus(response);
         await using var stream = await response.Content.ReadAsStreamAsync(token);
         return await ReadToolTurnAsync(stream, toolNamespace, token);

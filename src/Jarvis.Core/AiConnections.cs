@@ -20,13 +20,13 @@ public sealed record AiConnection
     public void Validate()
     {
         if (!Regex.IsMatch(Id, "^[a-f0-9]{32}$") || string.IsNullOrWhiteSpace(Name) || Name.Length > 100)
-            throw new InvalidDataException("Проверь название подключения.");
+            throw new InvalidDataException("Проверьте название подключения.");
         if (Provider is not ("api" or "ollama" or "chatgpt" or "claude"))
             throw new InvalidDataException("Этот способ подключения пока не поддерживается.");
-        if (Model.Length > 200 || Model.Any(char.IsControl)) throw new InvalidDataException("Проверь название модели.");
+        if (Model.Length > 200 || Model.Any(char.IsControl)) throw new InvalidDataException("Проверьте название модели.");
         if (!IsSubscription) _ = BaseAddress();
         if (IsSubscription && CliPath.Length > 0 && (!Path.IsPathFullyQualified(CliPath) || !CliPath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)))
-            throw new InvalidDataException("Укажи полный путь к исполняемому файлу .exe.");
+            throw new InvalidDataException("Укажите полный путь к исполняемому файлу .exe.");
     }
 
     public Uri BaseAddress()
@@ -34,7 +34,7 @@ public sealed record AiConnection
         if (!Uri.TryCreate(Endpoint.Trim().TrimEnd('/') + "/", UriKind.Absolute, out var uri)
             || uri.Scheme != "https" && !(uri.Scheme == "http" && uri.IsLoopback)
             || uri.UserInfo.Length > 0 || uri.Query.Length > 0 || uri.Fragment.Length > 0)
-            throw new InvalidDataException("Нужен адрес HTTPS; HTTP разрешён только для локального сервера. Не вставляй ключ в адрес.");
+            throw new InvalidDataException("Нужен адрес HTTPS; HTTP разрешён только для локального сервера. Не вставляйте ключ в адрес.");
         return uri;
     }
 }
@@ -53,11 +53,11 @@ public sealed record AiConfiguration
     public void Validate()
     {
         if (Connections.Count > 30 || Connections.Select(c => c.Id).Distinct().Count() != Connections.Count)
-            throw new InvalidDataException("Проверь список подключений: не более 30, без повторов.");
+            throw new InvalidDataException("Проверьте список подключений: не более 30, без повторов.");
         foreach (var connection in Connections) connection.Validate();
         if (ProtectedChromeToken.Length > 2048 || ProtectedChromeToken.Any(char.IsWhiteSpace))
-            throw new InvalidDataException("Проверь код подключения браузера.");
-        if (Enabled && Active == null) throw new InvalidDataException("Выбери подключение для ответов нейросети.");
+            throw new InvalidDataException("Проверьте код подключения браузера.");
+        if (Enabled && Active == null) throw new InvalidDataException("Выберите подключение для ответов нейросети.");
     }
 }
 

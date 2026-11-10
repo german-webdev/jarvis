@@ -31,6 +31,6 @@ public static class PortableToolProtocol
             return new([root.Clone()], [call], "");
         }
         catch (Exception error) when (error is JsonException or InvalidOperationException)
-        { throw new InvalidDataException("Модель вернула некорректный вызов инструмента. Выбери модель с поддержкой структурированных ответов."); }
+        { throw new InvalidDataException("Модель вернула некорректный вызов инструмента. Выберите модель с поддержкой структурированных ответов."); }
     }
 }

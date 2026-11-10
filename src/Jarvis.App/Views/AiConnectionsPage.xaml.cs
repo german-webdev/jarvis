@@ -31,7 +31,7 @@ public partial class AiConnectionsPage : WorkspacePage
         ActionsBox.ToolTip = Ui.Text("Общее разрешение для выбранной нейросети. Запуск приложений из каталога и переключение на их окна.");
         ChromeBox.IsChecked = service.Configuration.ProtectedChromeToken.Length > 0;
         ChromeBox.Content = Ui.Text("Работать в моём браузере");
-        BrowserHelpText.Text = Ui.Text("Работа в текущем профиле браузера на базе Chromium через расширение Playwright. JARVIS использует браузер по умолчанию с твоими входами на сайты. Установи расширение в нужном профиле и сохрани его код в JARVIS. При смене браузера или профиля сохрани новый код. Нейросеть читает страницы вкладок, доступных расширению.");
+        BrowserHelpText.Text = Ui.Text("Работа в текущем профиле браузера на базе Chromium через расширение Playwright. JARVIS использует браузер по умолчанию с вашими входами на сайты. Установите расширение в нужном профиле и сохраните его код в JARVIS. При смене браузера или профиля сохраните новый код. Нейросеть читает страницы вкладок, доступных расширению.");
         System.Windows.Automation.AutomationProperties.SetName(BrowserHelpButton, Ui.Text("Справка о работе в моём браузере"));
 
         ChromeInstallButton.Content = Ui.Text("Установить расширение Playwright");
@@ -75,7 +75,7 @@ public partial class AiConnectionsPage : WorkspacePage
             EndpointBox.Text = connection?.Endpoint ?? ""; ModelBox.Text = connection?.Model ?? "";
             ModelBox.ItemsSource = null;
             KeyBox.Clear(); RemoveKeyBox.IsChecked = false;
-            KeyStatus.Text = Ui.Text(string.IsNullOrEmpty(connection?.ProtectedApiKey) ? "Ключ не сохранён." : "Ключ сохранён. Оставь поле пустым, чтобы сохранить его.");
+            KeyStatus.Text = Ui.Text(string.IsNullOrEmpty(connection?.ProtectedApiKey) ? "Ключ не сохранён." : "Ключ сохранён. Оставьте поле пустым, чтобы сохранить его.");
             UpdatePanels();
         }
         finally { _loading = false; }
@@ -137,7 +137,7 @@ public partial class AiConnectionsPage : WorkspacePage
         }
         finally { _loading = false; }
         KeyBox.Clear(); RemoveKeyBox.IsChecked = false;
-        KeyStatus.Text = Ui.Text(string.IsNullOrEmpty(captured.ProtectedApiKey) ? "Ключ не сохранён." : "Ключ сохранён. Оставь поле пустым, чтобы сохранить его.");
+        KeyStatus.Text = Ui.Text(string.IsNullOrEmpty(captured.ProtectedApiKey) ? "Ключ не сохранён." : "Ключ сохранён. Оставьте поле пустым, чтобы сохранить его.");
         return captured;
     }
 
@@ -151,7 +151,7 @@ public partial class AiConnectionsPage : WorkspacePage
     {
         if (_editing == null) return;
         var selected = _editing; _editing = null; _connections.Remove(selected); Load(null);
-        StatusText.Text = Ui.Text("Удаление применится после сохранения. Для выхода из аккаунта сначала используй «Выйти из аккаунта».");
+        StatusText.Text = Ui.Text("Удаление применится после сохранения. Для выхода из аккаунта сначала используйте «Выйти из аккаунта».");
     }
     private void SaveClick(object sender, RoutedEventArgs e)
     {
@@ -164,7 +164,7 @@ public partial class AiConnectionsPage : WorkspacePage
                 chromeToken = ChromeCodeBox.SecurePassword.Length > 0
                     ? AiService.Protect(ChromeBrowserConnection.NormalizeToken(ChromeCodeBox.Password))
                     : _service.Configuration.ProtectedChromeToken;
-                if (chromeToken.Length == 0) throw new InvalidDataException("Вставь код из расширения Playwright.");
+                if (chromeToken.Length == 0) throw new InvalidDataException("Вставьте код из расширения Playwright.");
             }
             _service.Save(new AiConfiguration { Enabled = EnabledBox.IsChecked == true, UseForUnknownCommands = FallbackBox.IsChecked == true,
                 AllowLocalActions = ActionsBox.IsChecked == true, ProtectedChromeToken = chromeToken,
@@ -178,7 +178,7 @@ public partial class AiConnectionsPage : WorkspacePage
     }
 
     private void UpdateChromeHint() => ChromeHint.Text = Ui.Text(_service.Configuration.ProtectedChromeToken.Length == 0
-        ? "Скопируй код со страницы расширения и вставь его ниже. Выбранная нейросеть читает содержимое страниц рабочей вкладки."
+        ? "Скопируйте код со страницы расширения и вставьте его ниже. Выбранная нейросеть читает содержимое страниц рабочей вкладки."
         : "Код сохранён. Поле нужно только для замены кода.");
 
     private void BrowserHelpClick(object sender, RoutedEventArgs e)
@@ -201,7 +201,7 @@ public partial class AiConnectionsPage : WorkspacePage
         if (_operation != null) return;
         try
         {
-            var selected = CaptureCurrent() ?? throw new InvalidDataException("Сначала добавь или выбери подключение.");
+            var selected = CaptureCurrent() ?? throw new InvalidDataException("Сначала добавьте или выберите подключение.");
             selected.Validate();
             if (requireSaved)
             {
@@ -211,11 +211,11 @@ public partial class AiConnectionsPage : WorkspacePage
             }
             _operation = new CancellationTokenSource(TimeSpan.FromMinutes(5));
             Editor.IsEnabled = false; ConnectionsList.IsEnabled = false; ManageButtons.IsEnabled = false; GeneralOptions.IsEnabled = false; SaveButton.IsEnabled = false; CancelOperation.Visibility = Visibility.Visible;
-            ReportStatus("Выполняю запрос. При входе заверши авторизацию в браузере.");
+            ReportStatus("Выполняю запрос. При входе завершите авторизацию в браузере.");
             ReportStatus(await operation(selected, _operation.Token));
         }
         catch (OperationCanceledException) { ReportStatus("Операция отменена или истекло время ожидания."); }
-        catch (Exception error) { ReportStatus(error is InvalidDataException ? error.Message : "Подключение не удалось. Проверь интернет и доступность сервиса, затем повтори вход."); }
+        catch (Exception error) { ReportStatus(error is InvalidDataException ? error.Message : "Подключение не удалось. Проверьте интернет и доступность сервиса, затем повторите вход."); }
         finally
         {
             _operation?.Dispose(); _operation = null;
@@ -227,7 +227,7 @@ public partial class AiConnectionsPage : WorkspacePage
     {
         var models = await _service.ModelsAsync(connection, token);
         var chosen = ModelBox.Text; ModelBox.ItemsSource = models; ModelBox.Text = chosen;
-        return Ui.Format("Найдено моделей: {0}. Выбери нужную и сохрани.", models.Length);
+        return Ui.Format("Найдено моделей: {0}. Выберите нужную и сохраните.", models.Length);
     });
     private async void CheckClick(object sender, RoutedEventArgs e) => await OperateAsync(async (connection, token) =>
     {
@@ -238,7 +238,7 @@ public partial class AiConnectionsPage : WorkspacePage
             return Ui.Format("Аккаунт ChatGPT: {0}", account.Email.Length > 0 ? account.Email : connection.Name);
         }
         if (connection.IsSubscription) return await _service.Subscriptions.IsSignedInAsync(connection, token)
-            ? "Вход по подписке выполнен. Доступ к модели проверяется при отправке вопроса." : "Вход не выполнен. Сохрани подключение и нажми «Войти через браузер».";
+            ? "Вход по подписке выполнен. Доступ к модели проверяется при отправке вопроса." : "Вход не выполнен. Сохраните подключение и нажмите «Войти через браузер».";
         await _service.ModelsAsync(connection, token);
         return "Сервис доступен. Список моделей получен; генерация ответа не запускалась.";
     });
@@ -250,7 +250,7 @@ public partial class AiConnectionsPage : WorkspacePage
             {
                 SetBrowserLink(uri);
                 try { ChatGptSignIn.OpenBrowser(uri); }
-                catch { ReportStatus("Браузер не открылся. Нажми «Открыть браузер повторно»."); }
+                catch { ReportStatus("Браузер не открылся. Нажмите «Открыть браузер повторно»."); }
             }, new Progress<string>(ReportStatus), token);
             var account = _service.ChatGpt.Read(connection)!;
             return Ui.Format("Аккаунт ChatGPT: {0}", account.Email.Length > 0 ? account.Email : connection.Name);
@@ -273,7 +273,7 @@ public partial class AiConnectionsPage : WorkspacePage
     private void ReopenBrowserClick(object sender, RoutedEventArgs e)
     {
         try { if (_browserUri != null) ChatGptSignIn.OpenBrowser(_browserUri); }
-        catch { ReportStatus("Не удалось открыть браузер по умолчанию. Проверь его настройки в Windows."); }
+        catch { ReportStatus("Не удалось открыть браузер по умолчанию. Проверьте его настройки в Windows."); }
     }
     private void CancelOperationClick(object sender, RoutedEventArgs e) => _operation?.Cancel();
     private void CloseClick(object sender, RoutedEventArgs e) => Finish();

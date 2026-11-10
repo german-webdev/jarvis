@@ -22,7 +22,7 @@ public sealed class ChatGptSignIn(string root, ChatGptPlanClient client)
         var path = AccountPath(connection);
         if (!File.Exists(path)) return null;
         try { return JsonSerializer.Deserialize<ChatGptAccount>(AiService.Unprotect(File.ReadAllText(path))); }
-        catch { throw new InvalidDataException("Не удалось прочитать вход ChatGPT. Выполни вход заново."); }
+        catch { throw new InvalidDataException("Не удалось прочитать вход ChatGPT. Выполните вход заново."); }
     }
     private void Save(AiConnection connection, ChatGptAccount account)
     {
@@ -60,7 +60,7 @@ public sealed class ChatGptSignIn(string root, ChatGptPlanClient client)
             var uri = ChatGptPlanClient.AuthorizeUri(attempt, HostId());
             progress?.Report("Открываю браузер для входа в ChatGPT…");
             openBrowser(uri);
-            progress?.Report("Подтверди вход в браузере. JARVIS ждёт возвращения…");
+            progress?.Report("Подтвердите вход в браузере. JARVIS ждёт возвращения…");
             var query = await callback.ReceiveAsync(attempt.State, token);
             progress?.Report("Проверяю подтверждение аккаунта ChatGPT…");
             var account = await client.ExchangeAsync(attempt, query, previous, token);
@@ -75,10 +75,10 @@ public sealed class ChatGptSignIn(string root, ChatGptPlanClient client)
         try
         {
             var account = Read(connection);
-            if (account == null || !account.SignedIn) throw new InvalidDataException("Сначала войди в ChatGPT через браузер.");
+            if (account == null || !account.SignedIn) throw new InvalidDataException("Сначала войдите в ChatGPT через браузер.");
             if (account.ExpiresAt <= DateTimeOffset.UtcNow.AddMinutes(2))
             {
-                if (account.RefreshToken.Length == 0) throw new InvalidDataException("Вход ChatGPT истёк. Выполни вход заново.");
+                if (account.RefreshToken.Length == 0) throw new InvalidDataException("Вход ChatGPT истёк. Выполните вход заново.");
                 account = await client.RefreshAsync(account, token); Save(connection, account);
             }
             return account;

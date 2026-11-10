@@ -24,7 +24,7 @@ public static class MediaLibrary
     public static LaunchTarget FileEntry(string path)
     {
         path = Path.GetFullPath(path);
-        var kind = KindForPath(path) ?? throw new InvalidDataException("Выбери аудиофайл или видео поддерживаемого формата.");
+        var kind = KindForPath(path) ?? throw new InvalidDataException("Выберите аудиофайл или видео поддерживаемого формата.");
         var name = Path.GetFileNameWithoutExtension(path);
         return new(IdFor(path), name[..Math.Min(name.Length, 150)], kind, path, Path.GetFileName(Path.GetDirectoryName(path)) ?? "", [], true);
     }
@@ -49,7 +49,7 @@ public static class MediaLibrary
                 {
                     token.ThrowIfCancellationRequested();
                     if (++entries > 100000 || files.Count >= limit)
-                    { warnings.Add("Достигнут предел сканирования. Добавь более конкретную папку."); return new(files, warnings); }
+                    { warnings.Add("Достигнут предел сканирования. Добавьте более конкретную папку."); return new(files, warnings); }
                     if (Directory.Exists(path))
                     {
                         if (directory.Depth < 32) pending.Push((path, directory.Depth + 1));

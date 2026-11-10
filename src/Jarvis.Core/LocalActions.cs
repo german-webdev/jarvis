@@ -31,7 +31,7 @@ public sealed class LocalActionExecutor(Func<IReadOnlyList<LaunchTarget>> catalo
     public LocalAction ResolveModelAction(LocalAction action)
     {
         var index = Available.ToList().FindIndex(t => t.Id == action.TargetId);
-        if (index < 0) throw new InvalidDataException("Цель недоступна. Выбери включённое приложение из каталога.");
+        if (index < 0) throw new InvalidDataException("Цель недоступна. Выберите включённое приложение из каталога.");
         return action with { TargetId = _initial[index].Id };
     }
 
@@ -44,11 +44,11 @@ public sealed class LocalActionExecutor(Func<IReadOnlyList<LaunchTarget>> catalo
             Check();
             if (_stopped) return new(false, "Задача остановлена после неподтверждённого шага.");
             var matches = catalog().Where(t => t.Id == action.TargetId && IsAllowed(t)).ToArray();
-            if (matches.Length != 1 || !Enum.IsDefined(action.Kind)) return Stop("Цель недоступна. Выбери включённое приложение из каталога.");
+            if (matches.Length != 1 || !Enum.IsDefined(action.Kind)) return Stop("Цель недоступна. Выберите включённое приложение из каталога.");
             var target = matches[0];
             if (!_initial.Any(t => t == target)) return Stop("Запись каталога изменилась. Задача остановлена.");
             if (catalog().Count(t => IsAllowed(t) && CommandRouter.Normalize(t.Name) == CommandRouter.Normalize(target.Name)) != 1)
-                return Stop("Название неоднозначно. Уточни название приложения в каталоге и повтори задачу.");
+                return Stop("Название неоднозначно. Уточните название приложения в каталоге и повторите задачу.");
             if (_completed.ContainsKey(action)) return Stop("Повторный вызов действия. Задача остановлена без повторного выполнения.");
             if (_count >= MaxActions) return Stop("Достигнут предел: три действия на задачу.");
             if (_observed.TryGetValue(target.Id, out var known) && (known.Target != target || !windows.IsCurrent(target, known.Window)))
@@ -113,7 +113,7 @@ public static class AiLocalActions
         if (properties.Length != 1 || properties[0].Name != "target_id" || properties[0].Value.ValueKind != JsonValueKind.String)
             throw new InvalidDataException("Некорректные аргументы действия.");
         var id = properties[0].Value.GetString()!;
-        if (!targets.Any(t => t.Id == id)) throw new InvalidDataException("Цель недоступна. Выбери включённое приложение из каталога.");
+        if (!targets.Any(t => t.Id == id)) throw new InvalidDataException("Цель недоступна. Выберите включённое приложение из каталога.");
         return new(kind, id);
     }
 
@@ -125,7 +125,7 @@ public static class AiLocalActions
         deadline.CancelAfter(TimeLimit);
         var cancellation = deadline.Token;
         var targets = executor.Available;
-        if (targets.Count == 0) throw new InvalidDataException("Нет доступных приложений. Для задач ИИ включи запись EXE в каталоге.");
+        if (targets.Count == 0) throw new InvalidDataException("Нет доступных приложений. Для задач ИИ включите запись EXE в каталоге.");
         List<JsonElement> continuation = [];
         Dictionary<string, LocalAction> callIds = [];
         List<string> observations = [];

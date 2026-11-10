@@ -26,7 +26,7 @@ public static class StartupRegistration
     {
         if (!enabled) { Restore(null); return; }
         var executable = Path.Combine(AppContext.BaseDirectory, "Jarvis.exe");
-        if (!File.Exists(executable)) throw new IOException(Ui.Text("Не найден Jarvis.exe. Запусти приложение через Start-Jarvis.cmd."));
+        if (!File.Exists(executable)) throw new IOException(Ui.Text("Не найден Jarvis.exe. Запустите приложение через Start-Jarvis.cmd."));
         Restore($"\"{executable}\" --autostart");
     }
 }

@@ -10,7 +10,7 @@ public sealed record InstallationLayout(string Assets, string UserRoot, bool Ins
             return new(directory.FullName, Path.Combine(localApplicationData, "JARVIS"), true);
         while (directory != null && !File.Exists(Path.Combine(directory.FullName, "pyproject.toml"))) directory = directory.Parent;
         return directory == null
-            ? throw new DirectoryNotFoundException("Не найдены файлы JARVIS. Переустанови приложение.")
+            ? throw new DirectoryNotFoundException("Не найдены файлы JARVIS. Переустановите приложение.")
             : new(directory.FullName, directory.FullName, false);
     }
     public static string AssetRoot(string executableDirectory, string developmentRoot) =>

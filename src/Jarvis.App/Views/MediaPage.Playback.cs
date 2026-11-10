@@ -18,7 +18,7 @@ public partial class MediaPage
     {
         PlaybackState.Text = Ui.Text("Текущий источник");
         PlaybackTitle.Text = Ui.Text("Нет активного воспроизведения");
-        PlaybackSource.Text = Ui.Text("Запусти музыку или видео в любом приложении.");
+        PlaybackSource.Text = Ui.Text("Запустите музыку или видео в любом приложении.");
         PlaybackButton.Content = Ui.Text("Пауза");
         if (!monitor) return;
         _playbackTimer.Tick += async (_, _) => await RefreshPlaybackAsync();
@@ -56,7 +56,7 @@ public partial class MediaPage
                 token.ThrowIfCancellationRequested(); _displayedSession = null; PlaybackButton.IsEnabled = false;
                 PlaybackState.Text = Ui.Text("Текущий источник");
                 PlaybackTitle.Text = Ui.Text("Нет выбранного источника");
-                PlaybackSource.Text = sessions.Length == 0 ? Ui.Text("Запусти музыку или видео в любом приложении.") : Ui.Text(choice.Error ?? "Выбери источник в приложении.");
+                PlaybackSource.Text = sessions.Length == 0 ? Ui.Text("Запустите музыку или видео в любом приложении.") : Ui.Text(choice.Error ?? "Выберите источник в приложении.");
                 return;
             }
             var properties = await session.TryGetMediaPropertiesAsync().AsTask(timeout.Token);
@@ -104,7 +104,7 @@ public partial class MediaPage
             timeout.CancelAfter(TimeSpan.FromSeconds(5));
             var manager = await GlobalSystemMediaTransportControlsSessionManager.RequestAsync().AsTask(timeout.Token);
             var matching = manager.GetSessions().Where(s => s.SourceAppUserModelId == displayed.SourceAppUserModelId).ToArray();
-            if (matching.Length != 1) { Status.Text = Ui.Text("Источник изменился. Повтори действие."); return; }
+            if (matching.Length != 1) { Status.Text = Ui.Text("Источник изменился. Повторите действие."); return; }
             var session = matching[0];
             var playing = session.GetPlaybackInfo().PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
             var result = await MediaControl.ApplyAsync(session, playing ? Intent.MediaPause : Intent.MediaPlay, timeout.Token);

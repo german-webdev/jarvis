@@ -14,7 +14,7 @@ public sealed partial class MainViewModel
 {
     private readonly IBrowserVideoService _videoBrowser;
     private bool _browserPending;
-    private string _browserStatus = "Открой отдельный браузер для поиска видео. Личные вкладки не используются.";
+    private string _browserStatus = "Откройте отдельный браузер для поиска видео. Личные вкладки не используются.";
     public string BrowserStatus { get => _browserStatus.Contains('\n') ? Ui.Text(_browserStatus[.._browserStatus.IndexOf('\n')]) + _browserStatus[_browserStatus.IndexOf('\n')..] : Ui.Text(_browserStatus); private set => SetProperty(ref _browserStatus, value); }
     public bool BrowserConnected => _videoBrowser.Connected;
     public bool BrowserPending => _browserPending;
@@ -34,10 +34,10 @@ public sealed partial class MainViewModel
         {
             await _videoBrowser.ConnectAsync(_operation.Token);
             if (!Current()) return;
-            BrowserStatus = "Управляемый браузер открыт. Введи запрос видео.";
+            BrowserStatus = "Управляемый браузер открыт. Введите запрос видео.";
         }
-        catch (OperationCanceledException) { if (Current()) BrowserStatus = "Браузер не ответил вовремя. Повтори поиск."; }
-        catch (Exception ex) { if (Current()) BrowserStatus = ex is System.IO.InvalidDataException ? ex.Message : "Не удалось открыть браузер. Проверь, установлен ли Edge или Chrome."; }
+        catch (OperationCanceledException) { if (Current()) BrowserStatus = "Браузер не ответил вовремя. Повторите поиск."; }
+        catch (Exception ex) { if (Current()) BrowserStatus = ex is System.IO.InvalidDataException ? ex.Message : "Не удалось открыть браузер. Проверьте, установлен ли Edge или Chrome."; }
         finally { if (session == _session) { Busy = false; SetBrowserPending(false); OnPropertyChanged(nameof(BrowserConnected)); } }
     }
     public async Task SearchVideoAsync(string query)
@@ -80,7 +80,7 @@ public sealed partial class MainViewModel
             result = query != null ? await _videoBrowser.SearchAsync(query, token) : await _videoBrowser.OpenAsync(video!, token);
         }
         catch (OperationCanceledException) { return; }
-        catch (Exception) { result = new(false, "Связь с браузером потеряна. Открой управляемый браузер заново.", []); }
+        catch (Exception) { result = new(false, "Связь с браузером потеряна. Откройте управляемый браузер заново.", []); }
         finally
         {
             if (interrupt != null) EndTaskVoiceInterrupt(interrupt);
@@ -116,7 +116,7 @@ public sealed partial class MainViewModel
             if (index < VideoResults.Count) await RunBrowserVideoAsync(null, VideoResults[index].Video, session, token);
             else
             {
-                Reply = Ui.Text("Такого номера нет. Выбери видео из списка."); BrowserStatus = Reply;
+                Reply = Ui.Text("Такого номера нет. Выберите видео из списка."); BrowserStatus = Reply;
                 _askingChoice = true;
                 if (_voiceInteraction) { Phase = AssistantPhase.Synthesizing; Speak(session, Reply, Settings); }
                 else { Busy = false; Phase = AssistantPhase.Idle; _deadline = DateTime.MaxValue; }

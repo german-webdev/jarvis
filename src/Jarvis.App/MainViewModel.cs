@@ -100,7 +100,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     {
         AssistantPhase.Loading => "Знакомлюсь с системой",
         AssistantPhase.WaitingForName => "Я на связи",
-        AssistantPhase.Listening => "Слушаю тебя",
+        AssistantPhase.Listening => "Слушаю вас",
         AssistantPhase.Recognizing => "Разбираю команду",
         AssistantPhase.Executing => "Выполняю",
         AssistantPhase.Synthesizing => "Готовлю ответ",
@@ -162,7 +162,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         {
             if (captureSession != Interlocked.Read(ref _captureSession) || captureSession == 0) return;
             if (_worker?.Send(new { type = "audio", session = captureSession, pcm = Convert.ToBase64String(data) }) != true)
-                Dispatch(() => { if (captureSession == Interlocked.Read(ref _captureSession)) Fail("Очередь звука переполнена. Перезапусти модуль."); });
+                Dispatch(() => { if (captureSession == Interlocked.Read(ref _captureSession)) Fail("Очередь звука переполнена. Перезапустите модуль."); });
         };
         _audio.Level += value => Dispatch(() => { if (Phase != AssistantPhase.Speaking) Level = Math.Min(100, value * 200); });
         _audio.PlaybackLevel += value => Dispatch(() => { if (Phase == AssistantPhase.Speaking) Level = Math.Min(100, value * 160); });
@@ -170,7 +170,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         _audio.CaptureStateChanged += () => Dispatch(() => { if (!_disposed) MicrophoneActive = _audio.IsCapturing; });
         _watchdog = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _watchdog.Tick += (_, _) =>
-        { if (DateTime.UtcNow > _deadline) Fail("Модуль не ответил вовремя. Нажми «Перезапустить модуль»."); };
+        { if (DateTime.UtcNow > _deadline) Fail("Модуль не ответил вовремя. Нажмите «Перезапустить модуль»."); };
         _watchdog.Start();
         RefreshDevices();
     }
@@ -199,7 +199,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
             Microphones.Clear();
             foreach (var mic in _audio.GetDevices()) Microphones.Add(mic);
             SelectedMicrophone = Microphones.FirstOrDefault(m => m.Id == previous) ?? Microphones.FirstOrDefault();
-            if (Microphones.Count == 0) Status = "Микрофон не найден. Подключи его и обнови список.";
+            if (Microphones.Count == 0) Status = "Микрофон не найден. Подключите его и обновите список.";
         }
         catch (Exception ex) { Status = "Не удалось получить микрофоны: " + ex.Message; }
     }
@@ -258,7 +258,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         Busy = true;
         Transcript = "…";
         Phase = WakeMode ? AssistantPhase.WaitingForName : AssistantPhase.Listening;
-        Status = WakeMode ? "Скажи «Джарвис», затем команду. Между ними можно сделать паузу." : "Скажи команду. Например: открой браузер.";
+        Status = WakeMode ? "Скажите «Джарвис», затем команду. Между ними можно сделать паузу." : "Скажите команду. Например: «открой браузер».";
         _deadline = WakeMode ? DateTime.MaxValue : DateTime.UtcNow.AddSeconds(Settings.CommandWaitSeconds + 14);
         try
         {
@@ -371,7 +371,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         {
             Ready = true; _deadline = DateTime.MaxValue;
             Phase = AssistantPhase.Idle;
-            Status = "Нажми «Начать». Голос и микрофон можно изменить в настройках.";
+            Status = "Нажмите «Начать». Голос и микрофон можно изменить в настройках.";
             Log("Модели готовы · локально · CPU"); Initialized?.Invoke(); return;
         }
         var session = message.GetProperty("session").GetInt64();
@@ -420,7 +420,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
                 }
                 var wasChoosing = AwaitingChoice;
                 _conversation.Clear(); _powerConfirmation.Clear(); StopVideoChoice();
-                Phase = AssistantPhase.Idle; Status = wasChoosing ? "Ответа не было. Выбор отменён." : "Речь не обнаружена. Попробуй ещё раз.";
+                Phase = AssistantPhase.Idle; Status = wasChoosing ? "Ответа не было. Выбор отменён." : "Речь не обнаружена. Попробуйте ещё раз.";
                 Busy = false; _deadline = DateTime.MaxValue; CycleCompleted?.Invoke(false);
                 if (wasChoosing) await ResumeWakeAsync(session, token, 200);
                 break;
@@ -729,11 +729,11 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     {
         _followUp = false;
         if (!AwaitingChoice || SelectedMicrophone == null)
-        { _conversation.Clear(); _powerConfirmation.Clear(); StopVideoChoice(); Busy = false; Status = "Для голосового выбора нужен микрофон. Повтори команду."; return; }
+        { _conversation.Clear(); _powerConfirmation.Clear(); StopVideoChoice(); Busy = false; Status = "Для голосового выбора нужен микрофон. Повторите команду."; return; }
         var session = NewSession(); _acceptTranscript = true; Busy = true;
         Phase = AssistantPhase.Listening; Status = _powerConfirmation.HasPending
-            ? "Скажи «Подтверждаю» или «Отмена». Жду 10 секунд."
-            : "Назови часть или вариант. Повторять «Джарвис» не нужно. Жду 10 секунд.";
+            ? "Скажите «Подтверждаю» или «Отмена». Жду 10 секунд."
+            : "Назовите часть или вариант. Повторять «Джарвис» не нужно. Жду 10 секунд.";
         _deadline = DateTime.UtcNow.AddSeconds(24);
         try
         {

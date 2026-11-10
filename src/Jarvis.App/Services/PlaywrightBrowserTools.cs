@@ -15,8 +15,8 @@ internal sealed partial class PlaywrightBrowserTools(McpStdioClient client, Dire
     private const string Snapshot = "browser_snapshot";
     private const string Click = "browser_click";
     private const string Show = "browser_show";
-    private const string Unavailable = "Браузерный инструмент недоступен. Проверь установку JARVIS и Chrome или Edge.";
-    private const string NavigationError = "Браузер не смог прочитать страницу. Проверь интернет и доступ к сайту.";
+    private const string Unavailable = "Браузерный инструмент недоступен. Проверьте установку JARVIS и Chrome или Edge.";
+    private const string NavigationError = "Браузер не смог прочитать страницу. Проверьте интернет и доступ к сайту.";
     private const string NoResults = "Браузер открыл YouTube, но список видео не подтвердился.";
     private const string NoVideo = "Страница видео не подтвердилась.";
     private const string NoChannel = "Не удалось подтвердить нужный канал YouTube.";
@@ -182,7 +182,7 @@ internal sealed partial class PlaywrightBrowserTools(McpStdioClient client, Dire
             }
             return Error(channel ? NoChannel : watch ? NoVideo : NoResults);
         }
-        catch (TimeoutException) { return chrome != null ? ChromeError() : Error("Браузер не ответил вовремя. Повтори запрос."); }
+        catch (TimeoutException) { return chrome != null ? ChromeError() : Error("Браузер не ответил вовремя. Повторите запрос."); }
         catch (McpResponseTooLargeException)
         { return new(false, "The snapshot is too large. Call browser_snapshot with a smaller depth or a specific target.", "Страница слишком большая для чтения целиком."); }
         catch (Exception error) when (error is IOException or InvalidDataException or JsonException or InvalidOperationException or KeyNotFoundException)

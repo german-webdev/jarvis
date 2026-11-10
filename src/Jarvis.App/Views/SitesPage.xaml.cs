@@ -22,7 +22,7 @@ public partial class SitesPage : WorkspacePage
     {
         var entry = new SiteEntry(new("site:" + Guid.NewGuid().ToString("N"), Ui.Text("Новый сайт"), "url", "", Ui.Text("Сайт"), [], true));
         _entries.Add(entry); Entries.SelectedItem = entry; Entries.ScrollIntoView(entry);
-        StatusText.Text = Ui.Text("Укажи название и адрес, например https://example.com. Дополнительные названия необязательны.");
+        StatusText.Text = Ui.Text("Укажите название и адрес, например https://example.com. Дополнительные названия необязательны.");
     }
     private void RemoveClick(object sender, RoutedEventArgs e)
     {
@@ -49,7 +49,7 @@ public sealed class SiteEntry(LaunchTarget target)
         if (!WebSites.TryNormalizeAddress(Address, out var address))
             throw new InvalidDataException(Ui.Format("Сайт «{0}»: нужен адрес HTTP или HTTPS без пробелов и логина в адресе.", Name));
         var value = target with { Name = Name.Trim(), Target = address, Enabled = Enabled, Aliases = NameVariants.SplitCustom([AliasesText]).ToArray() };
-        if (!value.IsValid) throw new InvalidDataException(Ui.Text("Проверь название сайта (до 150 символов) и дополнительные названия (до 20, по 100 символов)."));
+        if (!value.IsValid) throw new InvalidDataException(Ui.Text("Проверьте название сайта (до 150 символов) и дополнительные названия (до 20, по 100 символов)."));
         return value;
     }
 }

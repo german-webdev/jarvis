@@ -27,13 +27,13 @@ public sealed class MusicPlayback(Func<IReadOnlyList<LaunchTarget>> catalog, Fun
             catalog(), preferred(), request.MediaScope, _lastControlled);
         if (choice.SourceId == null) return new(false, choice.Error ?? "Не удалось выбрать плеер.");
         var matching = sessions.Where(s => s.SourceAppUserModelId == choice.SourceId).ToArray();
-        if (matching.Length != 1) return new(false, "У приложения несколько источников воспроизведения. Оставь нужный и повтори команду.");
+        if (matching.Length != 1) return new(false, "У приложения несколько источников воспроизведения. Оставьте нужный и повторите команду.");
         var session = matching[0];
         if (request.Intent is Intent.MusicVolumeUp or Intent.MusicVolumeDown)
         {
             var selected = Describe(session, catalog());
             var target = catalog().FirstOrDefault(t => t.Enabled && t.Id == selected.CatalogId);
-            if (target == null) return new(false, "Не удалось определить громкость этого источника. Скажи «систему тише» или «систему громче».");
+            if (target == null) return new(false, "Не удалось определить громкость этого источника. Скажите «систему тише» или «систему громче».");
             string? executable = target.Kind == "exe" ? target.Target : null;
             if (target.Kind == "app") executable = (await AppLocations.ExecutablesAsync(token)).GetValueOrDefault(target.Target);
             if (executable == null) return new(false, "Громкость этого плеера пока недоступна. Общую громкость можно изменить командой «систему тише» или «систему громче».");
@@ -61,8 +61,8 @@ public sealed class MusicPlayback(Func<IReadOnlyList<LaunchTarget>> catalog, Fun
                 await Task.Delay(400, token); sessions = Matching();
             }
         }
-        if (sessions.Length == 0) return new(false, $"Открываю {target.Name}. Плеер ещё не готов: выбери музыку в приложении, затем скажи «продолжи».");
-        if (sessions.Length != 1) return new(false, "У этого приложения несколько медиасессий. Оставь нужный плеер открытым и повтори команду.");
+        if (sessions.Length == 0) return new(false, $"Открываю {target.Name}. Плеер ещё не готов: выберите музыку в приложении, затем скажите «продолжи».");
+        if (sessions.Length != 1) return new(false, "У этого приложения несколько медиасессий. Оставьте нужный плеер открытым и повторите команду.");
         var result = await MediaControl.ApplyAsync(sessions[0], Intent.MediaPlay, token);
         return result with { Message = target.Name + ": " + result.Message };
     }

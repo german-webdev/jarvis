@@ -51,7 +51,7 @@ internal sealed class ManagedVideoBrowser : IVideoBrowserSession
     // Test-only dependency: fulfill document requests with local HTML. No public endpoint/profile/port injection.
     internal static async Task<IVideoBrowserSession> LaunchAsync(string root, Func<string, string?>? fixture, CancellationToken token)
     {
-        var exe = FindBrowser() ?? throw new InvalidDataException("Нужен установленный Microsoft Edge или Google Chrome. Установи браузер самостоятельно.");
+        var exe = FindBrowser() ?? throw new InvalidDataException("Нужен установленный Microsoft Edge или Google Chrome. Установите браузер самостоятельно.");
         root = Path.GetFullPath(root);
         var parent = Path.GetFullPath(Path.Combine(root, "work", "browser-sessions"));
         var profile = Path.Combine(parent, Guid.NewGuid().ToString("N"));
@@ -167,7 +167,7 @@ internal sealed class ManagedVideoBrowser : IVideoBrowserSession
             }
         }
         catch (Exception ex) { foreach (var pending in _pending.Values) pending.TrySetException(ex); }
-        finally { _problem ??= "Связь с браузером потеряна. Открой управляемый браузер заново."; _socket.Abort(); }
+        finally { _problem ??= "Связь с браузером потеряна. Откройте управляемый браузер заново."; _socket.Abort(); }
     }
     private async Task HandleEventAsync(string method, JsonElement message)
     {
@@ -176,19 +176,19 @@ internal sealed class ManagedVideoBrowser : IVideoBrowserSession
             var data = message.GetProperty("params");
             if ((method == "Target.targetDestroyed" || method == "Target.targetCrashed")
                 && data.TryGetProperty("targetId", out var closedTarget) && closedTarget.GetString() == _target)
-            { MarkProblem("Связь с браузером потеряна. Открой управляемый браузер заново."); return; }
+            { MarkProblem("Связь с браузером потеряна. Откройте управляемый браузер заново."); return; }
             if (method == "Target.detachedFromTarget" && data.TryGetProperty("sessionId", out var detached) && detached.GetString() == _session)
-            { MarkProblem("Связь с браузером потеряна. Открой управляемый браузер заново."); return; }
+            { MarkProblem("Связь с браузером потеряна. Откройте управляемый браузер заново."); return; }
             if (method == "Target.targetCreated" && _target != null)
             {
                 var target = data.GetProperty("targetInfo");
                 if (target.GetProperty("type").GetString() == "page" && target.GetProperty("targetId").GetString() != _target)
-                    MarkProblem("Открылась другая вкладка. Действие остановлено. Закрой управляемый браузер и подключи его заново.");
+                    MarkProblem("Открылась другая вкладка. Действие остановлено. Закройте управляемый браузер и подключите его заново.");
                 return;
             }
             if (!message.TryGetProperty("sessionId", out var session) || session.GetString() != _session) return;
             if (method == "Page.windowOpen") { MarkProblem("Сайт попытался открыть другую вкладку. Действие остановлено."); return; }
-            if (method == "Page.javascriptDialogOpening") { MarkProblem("Браузер показывает диалог. Реши это самостоятельно и повтори поиск."); return; }
+            if (method == "Page.javascriptDialogOpening") { MarkProblem("Браузер показывает диалог. Решите это самостоятельно и повторите поиск."); return; }
             if (method != "Fetch.requestPaused") return;
             var requestId = data.GetProperty("requestId").GetString();
             var url = data.GetProperty("request").GetProperty("url").GetString()!;
@@ -208,13 +208,13 @@ internal sealed class ManagedVideoBrowser : IVideoBrowserSession
             else
             {
                 if (document) MarkProblem(url.StartsWith("https://consent.", StringComparison.Ordinal)
-                    ? "Сайт требует согласие или вход. Автоматическое действие остановлено. Открой видео самостоятельно в обычном браузере."
-                    : "Переход на другой адрес заблокирован. Повтори поиск в управляемой вкладке.");
+                    ? "Сайт требует согласие или вход. Автоматическое действие остановлено. Откройте видео самостоятельно в обычном браузере."
+                    : "Переход на другой адрес заблокирован. Повторите поиск в управляемой вкладке.");
                 await CallAsync("Fetch.failRequest", new { requestId, errorReason = "BlockedByClient" }, _closed.Token);
             }
         }
         catch (OperationCanceledException) { }
-        catch { if (!_disposed) _problem ??= "Связь с браузером потеряна. Открой управляемый браузер заново."; }
+        catch { if (!_disposed) _problem ??= "Связь с браузером потеряна. Откройте управляемый браузер заново."; }
     }
     private void MarkProblem(string message) { _problem = message; Stop(); }
     public void Stop()

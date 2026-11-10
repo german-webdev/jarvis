@@ -90,7 +90,7 @@ public partial class MediaPage : WorkspacePage
     }
     private void AddPlayerClick(object sender, RoutedEventArgs e)
     {
-        var dialog = new OpenFileDialog { Filter = Ui.Text("Приложения (*.exe;*.lnk)|*.exe;*.lnk"), Title = Ui.Text("Выбери мультимедийный плеер") };
+        var dialog = new OpenFileDialog { Filter = Ui.Text("Приложения (*.exe;*.lnk)|*.exe;*.lnk"), Title = Ui.Text("Выберите мультимедийный плеер") };
         if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
         var file = dialog.FileName;
         AddPlayerTarget(new("player:" + Guid.NewGuid().ToString("N"), Path.GetFileNameWithoutExtension(file), Path.GetExtension(file).Equals(".lnk", StringComparison.OrdinalIgnoreCase) ? "shortcut" : "exe", file, "Добавлено вручную", [], true, MediaPlayer: true));
@@ -108,13 +108,13 @@ public partial class MediaPage : WorkspacePage
     }
     private void AddFolderClick(object sender, RoutedEventArgs e)
     {
-        var dialog = new OpenFolderDialog { Title = Ui.Text("Выбери папку с музыкой или видео"), Multiselect = true };
+        var dialog = new OpenFolderDialog { Title = Ui.Text("Выберите папку с музыкой или видео"), Multiselect = true };
         if (dialog.ShowDialog(Window.GetWindow(this)) == true) foreach (var path in dialog.FolderNames) AddRoot(path);
     }
     private void StandardFoldersClick(object sender, RoutedEventArgs e)
     {
         AddRoot(Environment.GetFolderPath(Environment.SpecialFolder.MyMusic)); AddRoot(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos));
-        Status.Text = Ui.Text("Добавлены существующие папки «Музыка» и «Видео» Windows. Нажми «Найти файлы».");
+        Status.Text = Ui.Text("Добавлены существующие папки «Музыка» и «Видео» Windows. Нажмите «Найти файлы».");
     }
     private static bool IsWithin(string file, string folder) => Path.GetFullPath(file).StartsWith(Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder)) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
     private void RemoveFolderClick(object sender, RoutedEventArgs e)
@@ -137,7 +137,7 @@ public partial class MediaPage : WorkspacePage
             var known = _files.Select(f => f.Id).ToHashSet();
             foreach (var file in result.Files) if (known.Add(file.Id)) _files.Add(new(file));
             Status.Text = Ui.Format("Файлов в каталоге: {0}. Недоступные записи можно убрать вручную.", _files.Count);
-            if (result.Warnings.Count > 0) Status.Text += " " + Ui.Format("Предупреждений: {0}. Проверь доступность папок или выбери папку меньшего размера.", result.Warnings.Count);
+            if (result.Warnings.Count > 0) Status.Text += " " + Ui.Format("Предупреждений: {0}. Проверьте доступность папок или выберите папку меньшего размера.", result.Warnings.Count);
         }
         catch (OperationCanceledException) { Status.Text = Ui.Text("Поиск остановлен. Каталог сохранится только по кнопке «Сохранить»."); }
         catch (Exception ex) { Status.Text = Ui.Text("Не удалось выполнить поиск: ") + ex.Message; }

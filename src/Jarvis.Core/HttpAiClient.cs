@@ -6,7 +6,8 @@ namespace Jarvis.Core;
 
 public sealed class HttpAiClient(HttpClient client)
 {
-    public const string SystemPrompt = "Ты JARVIS, голосовой помощник. Отвечай по-русски, кратко, обычным текстом, не более 6 предложений. У тебя нет доступа к компьютеру пользователя и нет инструментов. Не утверждай, что выполнил действие на компьютере. Если тебя просят что-то открыть или изменить, объясни, что для этого нужны встроенные команды JARVIS.";
+    public const string AddressStyle = " Address the user politely and naturally. In Russian use formal plural вы with a lowercase letter and polite imperatives. Avoid informal ты when addressing the user. Keep quoted user commands unchanged.";
+    public const string SystemPrompt = "Ты JARVIS, голосовой помощник. Отвечай по-русски, кратко, обычным текстом, не более 6 предложений. У тебя нет доступа к компьютеру пользователя и нет инструментов. Не утверждай, что выполнил действие на компьютере. Если тебя просят что-то открыть или изменить, объясни, что для этого нужны встроенные команды JARVIS." + AddressStyle;
 
     public async Task<string[]> ModelsAsync(AiConnection connection, string key, CancellationToken token)
     {
@@ -23,7 +24,7 @@ public sealed class HttpAiClient(HttpClient client)
 
     public async Task<string> AskAsync(AiConnection connection, string key, IReadOnlyList<AiMessage> conversation, CancellationToken token)
     {
-        if (string.IsNullOrWhiteSpace(connection.Model)) throw new InvalidDataException("Выбери модель в настройках нейросети.");
+        if (string.IsNullOrWhiteSpace(connection.Model)) throw new InvalidDataException("Выберите модель в настройках нейросети.");
         AiRequest.ValidateInput(conversation);
         return CleanAnswer(await CompleteAsync(connection, key, SystemPrompt, conversation, token));
     }
@@ -62,7 +63,7 @@ public sealed class HttpAiClient(HttpClient client)
         if (body != null) request.Content = JsonContent.Create(body);
         using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
         if (!response.IsSuccessStatusCode)
-            throw new InvalidDataException($"Сервис нейросети вернул HTTP {(int)response.StatusCode}. Проверь адрес, доступ и выбранную модель.");
+            throw new InvalidDataException($"Сервис нейросети вернул HTTP {(int)response.StatusCode}. Проверьте адрес, доступ и выбранную модель.");
         await using var stream = await response.Content.ReadAsStreamAsync(token);
         using var buffer = new MemoryStream();
         var block = new byte[8192];

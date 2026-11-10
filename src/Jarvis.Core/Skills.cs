@@ -21,7 +21,7 @@ public sealed class SkillDispatcher(IEnumerable<ISkill> skills)
         if (skill == null) return new(false, request.Explanation ?? "Команду не понял. Список доступных фраз находится в меню «Справка».");
         try { return await skill.ExecuteAsync(request, token); }
         catch (OperationCanceledException) { throw; }
-        catch (Exception) { return new(false, "Не удалось выполнить действие. Проверь устройство или запись приложения в каталоге и попробуй снова."); }
+        catch (Exception) { return new(false, "Не удалось выполнить действие. Проверьте устройство или запись приложения в каталоге и попробуйте снова."); }
     }
 }
 public sealed class DelegateSkill(Intent[] intents, Func<CommandRequest, CancellationToken, Task<SkillResult>> execute) : ISkill

@@ -55,10 +55,10 @@ public sealed class BrowserVideoService(Func<CancellationToken, Task<IVideoBrows
     public Task<BrowserVideoResult> SearchAsync(string query, CancellationToken token) => RunAsync(async (browser, ct) =>
     {
         _results = []; _searchUrl = null;
-        if (string.IsNullOrWhiteSpace(query) || query.Length > 300 || query.Any(char.IsControl)) return Failure("Укажи запрос от 1 до 300 символов.");
+        if (string.IsNullOrWhiteSpace(query) || query.Length > 300 || query.Any(char.IsControl)) return Failure("Укажите запрос от 1 до 300 символов.");
         var url = "https://www.youtube.com/results?search_query=" + Uri.EscapeDataString(query.Trim());
         var page = await NavigateAsync(browser, url, ct);
-        if (!page.GetProperty("search").GetBoolean()) return Failure("Страница поиска не распознана. Проверь браузер и повтори поиск.");
+        if (!page.GetProperty("search").GetBoolean()) return Failure("Страница поиска не распознана. Проверьте браузер и повторите поиск.");
         List<BrowserVideo> videos = [];
         foreach (var item in page.GetProperty("videos").EnumerateArray())
         {
@@ -70,28 +70,28 @@ public sealed class BrowserVideoService(Func<CancellationToken, Task<IVideoBrows
         }
         ct.ThrowIfCancellationRequested(); Check(browser);
         _results = videos.ToArray(); _searchUrl = url;
-        return videos.Count == 0 ? Failure("Видео не найдены или страница изменилась. Попробуй другой запрос.")
-            : new(true, "Выбери видео по номеру или в списке.", Array.AsReadOnly(_results));
+        return videos.Count == 0 ? Failure("Видео не найдены или страница изменилась. Попробуйте другой запрос.")
+            : new(true, "Выберите видео по номеру или в списке.", Array.AsReadOnly(_results));
     }, token);
 
     public Task<BrowserVideoResult> OpenAsync(BrowserVideo video, CancellationToken token) => RunAsync(async (browser, ct) =>
     {
         if (!BrowserVideoCommands.ValidId(video.Id) || !_results.Contains(video) || _searchUrl == null)
-            return Failure("Выбор устарел. Повтори поиск видео.");
+            return Failure("Выбор устарел. Повторите поиск видео.");
         var before = await ReadAsync(browser, ct);
         if (before.GetProperty("url").GetString() != _searchUrl || before.GetProperty("consent").GetBoolean())
-        { _results = []; return Failure("Вкладка изменилась. Повтори поиск видео."); }
+        { _results = []; return Failure("Вкладка изменилась. Повторите поиск видео."); }
         var stillPresent = before.GetProperty("videos").EnumerateArray().Any(item =>
             BrowserVideoCommands.TryVideoUrl(item.GetProperty("url").GetString(), out var id) && id == video.Id
             && Clean(item.GetProperty("title").GetString(), 300) == video.Title
             && Clean(item.GetProperty("channel").GetString(), 150) == video.Channel);
-        if (!stillPresent) { _results = []; return Failure("Выбор устарел. Повтори поиск видео."); }
+        if (!stillPresent) { _results = []; return Failure("Выбор устарел. Повторите поиск видео."); }
         _results = []; _searchUrl = null; // consume once, including timeout/failure
         var page = await NavigateAsync(browser, video.Url, ct);
         if (!BrowserVideoCommands.TryVideoUrl(page.GetProperty("canonical").GetString(), out var canonicalId) || canonicalId != video.Id)
-            return Failure("Адрес видео не подтверждён. Проверь вкладку браузера.");
+            return Failure("Адрес видео не подтверждён. Проверьте вкладку браузера.");
         var title = Clean(page.GetProperty("title").GetString(), 300);
-        if (title.Length == 0 || title is "YouTube" or "YouTube - YouTube") return Failure("Название видео не подтверждено. Проверь вкладку браузера.");
+        if (title.Length == 0 || title is "YouTube" or "YouTube - YouTube") return Failure("Название видео не подтверждено. Проверьте вкладку браузера.");
         return new(true, "Страница видео открыта. Воспроизведение не проверено.", [], video.Url, title);
     }, token);
 
@@ -104,7 +104,7 @@ public sealed class BrowserVideoService(Func<CancellationToken, Task<IVideoBrows
         try
         {
             if (generation != _generation) throw new OperationCanceledException();
-            if (!Connected) return Failure("Сначала открой управляемый браузер в разделе «Сайты → Видео YouTube».");
+            if (!Connected) return Failure("Сначала откройте управляемый браузер в разделе «Сайты → Видео YouTube».");
             using var stopOnCancel = timeout.Token.Register(() => _browser?.Stop());
             var result = await action(_browser!, timeout.Token);
             timeout.Token.ThrowIfCancellationRequested();
@@ -112,10 +112,10 @@ public sealed class BrowserVideoService(Func<CancellationToken, Task<IVideoBrows
             return result;
         }
         catch (OperationCanceledException) when (!token.IsCancellationRequested && generation == _generation && !_lifetime.IsCancellationRequested)
-        { _browser?.Stop(); _results = []; return Failure(_browser?.Problem ?? "Браузер не ответил вовремя. Повтори поиск."); }
+        { _browser?.Stop(); _results = []; return Failure(_browser?.Problem ?? "Браузер не ответил вовремя. Повторите поиск."); }
         catch (InvalidDataException ex) { _results = []; return Failure(ex.Message); }
         catch (Exception) when (!token.IsCancellationRequested && generation == _generation)
-        { _results = []; return Failure("Связь с браузером потеряна. Открой управляемый браузер заново."); }
+        { _results = []; return Failure("Связь с браузером потеряна. Откройте управляемый браузер заново."); }
         finally { _gate.Release(); }
     }
     private static async Task<JsonElement> NavigateAsync(IVideoBrowserSession browser, string url, CancellationToken token)
@@ -123,7 +123,7 @@ public sealed class BrowserVideoService(Func<CancellationToken, Task<IVideoBrows
         token.ThrowIfCancellationRequested(); Check(browser);
         browser.ExpectNavigation(url);
         var nav = await browser.CallAsync("Page.navigate", new { url }, token);
-        if (nav.TryGetProperty("errorText", out _)) { Check(browser); throw new InvalidDataException("Страница недоступна. Проверь браузер и подключение к интернету."); }
+        if (nav.TryGetProperty("errorText", out _)) { Check(browser); throw new InvalidDataException("Страница недоступна. Проверьте браузер и подключение к интернету."); }
         var loader = nav.TryGetProperty("loaderId", out var loaderId) ? loaderId.GetString() : null;
         var started = DateTime.UtcNow;
         while (true)
@@ -139,7 +139,7 @@ public sealed class BrowserVideoService(Func<CancellationToken, Task<IVideoBrows
             try { page = await ReadAsync(browser, token); }
             catch (InvalidOperationException) { await Task.Delay(150, token); continue; }
             var observed = page.GetProperty("url").GetString();
-            if (page.GetProperty("consent").GetBoolean()) throw new InvalidDataException("Сайт требует согласие или вход. Автоматическое действие остановлено. Открой видео самостоятельно в обычном браузере.");
+            if (page.GetProperty("consent").GetBoolean()) throw new InvalidDataException("Сайт требует согласие или вход. Автоматическое действие остановлено. Откройте видео самостоятельно в обычном браузере.");
             // The old document can remain briefly while navigation commits. Never accept it.
             if (observed == url && page.GetProperty("ready").GetString() == "complete")
             {

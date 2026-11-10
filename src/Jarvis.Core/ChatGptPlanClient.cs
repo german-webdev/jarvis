@@ -59,7 +59,7 @@ public sealed partial class ChatGptPlanClient(HttpClient http)
             var parts = pair.Split('=', 2);
             var key = Uri.UnescapeDataString(parts[0].Replace('+', ' '));
             if (!result.TryAdd(key, parts.Length == 2 ? Uri.UnescapeDataString(parts[1].Replace('+', ' ')) : ""))
-                throw new InvalidDataException("Некорректный ответ авторизации. Начни вход заново.");
+                throw new InvalidDataException("Некорректный ответ авторизации. Начните вход заново.");
         }
         return result;
     }
@@ -68,11 +68,11 @@ public sealed partial class ChatGptPlanClient(HttpClient http)
     {
         var values = ParseQuery(query);
         if (!values.TryGetValue("state", out var state) || !CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(state), Encoding.UTF8.GetBytes(attempt.State)))
-            throw new InvalidDataException("Ответ браузера не относится к этому входу. Начни вход заново.");
+            throw new InvalidDataException("Ответ браузера не относится к этому входу. Начните вход заново.");
         if (values.ContainsKey("error")) throw new InvalidDataException("Вход отменён или доступ к подписке не разрешён в браузере.");
         var id = values.GetValueOrDefault("client_id", attempt.ClientId);
         if (string.IsNullOrWhiteSpace(id) || id == "dynamic_agent_client" || (attempt.ClientId != "dynamic_agent_client" && id != attempt.ClientId))
-            throw new InvalidDataException("Регистрация ChatGPT не завершена. Начни вход заново.");
+            throw new InvalidDataException("Регистрация ChatGPT не завершена. Начните вход заново.");
         if (!values.TryGetValue("code", out var code) || string.IsNullOrWhiteSpace(code))
             throw new InvalidDataException("Браузер не передал подтверждение входа.");
         return (id, code);
@@ -87,7 +87,7 @@ public sealed partial class ChatGptPlanClient(HttpClient http)
         using var keys = await GetJsonAsync(Issuer + "/.well-known/jwks.json", null, token);
         var identity = ValidateIdentity(account.IdToken, keys.RootElement, id, attempt.Nonce, DateTimeOffset.UtcNow);
         if (previous != null && previous.Subject.Length > 0 && previous.Subject != identity.Subject)
-            throw new InvalidDataException("Выбран другой аккаунт. Добавь отдельное подключение для него.");
+            throw new InvalidDataException("Выбран другой аккаунт. Добавьте отдельное подключение для него.");
         return account with { Subject = identity.Subject, Email = identity.Email };
     }
 
@@ -135,11 +135,11 @@ public sealed partial class ChatGptPlanClient(HttpClient http)
         var scope = data.TryGetProperty("scope", out var s) ? s.GetString() ?? "" : previous.Scope;
         var expires = data.GetProperty("expires_in").GetInt32();
         if (access.Length == 0 || expires <= 0 || !string.Equals(data.GetProperty("token_type").GetString(), "Bearer", StringComparison.OrdinalIgnoreCase))
-            throw new InvalidDataException("ChatGPT не выдал действительный доступ. Повтори вход.");
+            throw new InvalidDataException("ChatGPT не выдал действительный доступ. Повторите вход.");
         var result = previous with { AccessToken = access, Scope = scope, ExpiresAt = DateTimeOffset.UtcNow.AddSeconds(expires),
             RefreshToken = data.TryGetProperty("refresh_token", out var refresh) ? refresh.GetString() ?? "" : previous.RefreshToken,
             IdToken = data.TryGetProperty("id_token", out var id) ? id.GetString() ?? "" : previous.IdToken };
-        if (!result.CanUsePlan) throw new InvalidDataException("В браузере не разрешено использование подписки ChatGPT. Повтори вход и разреши доступ.");
+        if (!result.CanUsePlan) throw new InvalidDataException("В браузере не разрешено использование подписки ChatGPT. Повторите вход и разрешите доступ.");
         return result;
     }
 
@@ -168,7 +168,7 @@ public sealed partial class ChatGptPlanClient(HttpClient http)
 
     public async Task<string> AskAsync(ChatGptAccount account, string model, IReadOnlyList<AiMessage> conversation, CancellationToken token)
     {
-        if (string.IsNullOrWhiteSpace(model)) throw new InvalidDataException("Выбери модель в настройках нейросети.");
+        if (string.IsNullOrWhiteSpace(model)) throw new InvalidDataException("Выберите модель в настройках нейросети.");
         AiRequest.ValidateInput(conversation);
         using var request = new HttpRequestMessage(HttpMethod.Post, Resource + "/responses");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", account.AccessToken);
@@ -202,9 +202,9 @@ public sealed partial class ChatGptPlanClient(HttpClient http)
             if (type == "response.output_text.delta") answer.Append(root.GetProperty("delta").GetString());
             if (type == "response.completed") return HttpAiClient.CleanAnswer(answer.ToString());
             if (type is "response.failed" or "response.incomplete" or "error")
-                throw new InvalidDataException("ChatGPT не завершил ответ. Проверь лимит подписки и доступ к модели.");
+                throw new InvalidDataException("ChatGPT не завершил ответ. Проверьте лимит подписки и доступ к модели.");
         }
-        throw new InvalidDataException("Ответ ChatGPT прервался до завершения. Повтори вопрос.");
+        throw new InvalidDataException("Ответ ChatGPT прервался до завершения. Повторите вопрос.");
     }
 
     private async Task<JsonDocument> TokenAsync(Dictionary<string, string> fields, CancellationToken token)
@@ -234,6 +234,6 @@ public sealed partial class ChatGptPlanClient(HttpClient http)
     private static void CheckStatus(HttpResponseMessage response)
     {
         if (!response.IsSuccessStatusCode)
-            throw new InvalidDataException($"ChatGPT вернул HTTP {(int)response.StatusCode}. Проверь доступ к сервису, вход и лимиты подписки.");
+            throw new InvalidDataException($"ChatGPT вернул HTTP {(int)response.StatusCode}. Проверьте доступ к сервису, вход и лимиты подписки.");
     }
 }

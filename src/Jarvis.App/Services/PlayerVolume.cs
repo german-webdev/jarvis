@@ -33,8 +33,8 @@ public static class PlayerVolume
                 }
             }
             // Never change the system mixer or an unrelated application as a fallback.
-            if (matches.Count == 0) return new(false, "Аудиоканал выбранного плеера не найден. Начни воспроизведение и повтори команду.");
-            if (matches.Count > 1) return new(false, "У плеера несколько аудиоканалов. Оставь одно воспроизведение и повтори команду.");
+            if (matches.Count == 0) return new(false, "Аудиоканал выбранного плеера не найден. Начните воспроизведение и повторите команду.");
+            if (matches.Count > 1) return new(false, "У плеера несколько аудиоканалов. Оставьте одно воспроизведение и повторите команду.");
             token.ThrowIfCancellationRequested();
             var volume = matches[0].SimpleAudioVolume;
             float expected = Math.Clamp(volume.Volume + delta, 0, 1);

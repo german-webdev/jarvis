@@ -20,7 +20,7 @@ public sealed class PowerConfirmation
         var action = ActionName(intent);
         _pending = intent;
         Renew(now);
-        return $"Подтверди {action}. Скажи «Подтверждаю» или «Отмена».";
+        return $"Подтвердите {action}. Скажите «Подтверждаю» или «Отмена».";
     }
     public void Renew(DateTimeOffset now) { if (HasPending) _expires = now.AddSeconds(30); }
     public void Clear() => _pending = null;

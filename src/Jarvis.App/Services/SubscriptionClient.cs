@@ -29,7 +29,7 @@ public sealed class SubscriptionClient(string sessionRoot)
     {
         connection.Validate();
         var exe = string.IsNullOrWhiteSpace(connection.CliPath) ? FindExecutable(connection.Provider) : connection.CliPath;
-        if (exe == null || !File.Exists(exe)) throw new InvalidDataException("Компонент входа Claude Code не установлен. Установи его с официального сайта Claude; JARVIS найдёт его автоматически.");
+        if (exe == null || !File.Exists(exe)) throw new InvalidDataException("Компонент входа Claude Code не установлен. Установите его с официального сайта Claude; JARVIS найдёт его автоматически.");
         var home = Path.GetFullPath(Path.Combine(sessionRoot, connection.Id));
         if (!home.StartsWith(Path.GetFullPath(sessionRoot).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException("Неверный каталог подключения.");
@@ -74,7 +74,7 @@ public sealed class SubscriptionClient(string sessionRoot)
         AccountChanging?.Invoke(connection);
         var result = await RunAsync(CreateStart(connection, connection.Provider == "chatgpt" ? ["login"] : ["auth", "login"]), null, token, browserLink);
         if (result.Code != 0 || !await IsSignedInAsync(connection, token))
-            throw new InvalidDataException("Вход по подписке не завершён. Проверь вход в браузере и доступность официального клиента.");
+            throw new InvalidDataException("Вход по подписке не завершён. Проверьте вход в браузере и доступность официального клиента.");
         AccountChanging?.Invoke(connection);
     }
 
@@ -117,9 +117,9 @@ public sealed class SubscriptionClient(string sessionRoot)
     public async Task<string> AskAsync(AiConnection connection, IReadOnlyList<AiMessage> conversation, CancellationToken token)
     {
         var input = RequestInput(conversation);
-        if (!await IsSignedInAsync(connection, token)) throw new InvalidDataException("Сначала выполни вход по подписке в настройках этого подключения.");
+        if (!await IsSignedInAsync(connection, token)) throw new InvalidDataException("Сначала выполните вход по подписке в настройках этого подключения.");
         var result = await RunAsync(CreateStart(connection, AnswerArguments(connection)), input, token);
-        if (result.Code != 0) throw new InvalidDataException("Официальный клиент не вернул ответ. Проверь вход, лимиты подписки и выбранную модель.");
+        if (result.Code != 0) throw new InvalidDataException("Официальный клиент не вернул ответ. Проверьте вход, лимиты подписки и выбранную модель.");
         return ReadAnswer(connection.Provider, result.Output);
     }
 

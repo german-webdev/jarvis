@@ -20,7 +20,7 @@ public static class MusicSelection
     {
         // The launch preference applies only when the user explicitly names music.
         if (scope == MediaScope.Music && !string.IsNullOrEmpty(preferredId))
-            return Unique(sessions.Where(s => s.CatalogId == preferredId).ToArray(), "Выбранный музыкальный плеер недоступен. Скажи «включи музыку».");
+            return Unique(sessions.Where(s => s.CatalogId == preferredId).ToArray(), "Выбранный музыкальный плеер недоступен. Скажите «включи музыку».");
         var eligible = sessions.Where(s => scope switch
         {
             MediaScope.Music => catalog.Any(t => t.Enabled && t.Id == s.CatalogId && IsMediaApp(t)),
@@ -31,7 +31,7 @@ public static class MusicSelection
         var pool = playing.Length > 0 ? playing : eligible;
         if (pool.Length == 1 && sessions.Count(s => s.SourceId == pool[0].SourceId) > 1)
             return Unique(sessions.Where(s => s.SourceId == pool[0].SourceId).ToArray(), "");
-        if (pool.Length <= 1) return Unique(pool, "Активного плеера не нашёл. Сначала включи музыку или видео.");
+        if (pool.Length <= 1) return Unique(pool, "Активного плеера не нашёл. Сначала включите музыку или видео.");
         // A browser can publish several sessions with the same source ID. Never guess between them.
         var current = pool.Where(s => s.IsCurrent).ToArray();
         if (current.Length == 1 && sessions.Count(s => s.SourceId == current[0].SourceId) == 1) return new(current[0].SourceId);
@@ -40,9 +40,9 @@ public static class MusicSelection
             var recent = pool.Where(s => s.SourceId == lastControlled).ToArray();
             if (recent.Length == 1) return new(lastControlled);
         }
-        return new(null, "Доступно несколько источников. Выбери нужное видео или плеер в Windows либо уточни: «останови музыку» или «пауза видео».");
+        return new(null, "Доступно несколько источников. Выберите нужное видео или плеер в Windows либо уточните: «останови музыку» или «пауза видео».");
     }
     private static MediaChoice Unique(IReadOnlyList<MediaCandidate> sessions, string missing) => sessions.Count switch {
         1 => new(sessions[0].SourceId), 0 => new(null, missing),
-        _ => new(null, "У приложения несколько источников воспроизведения. Оставь нужный и повтори команду.") };
+        _ => new(null, "У приложения несколько источников воспроизведения. Оставьте нужный и повторите команду.") };
 }

@@ -127,7 +127,7 @@ public class BrowserVideoTests
             if (method == "Page.navigate")
             {
                 Url = JsonSerializer.SerializeToElement(parameters).GetProperty("url").GetString()!;
-                if (Failure == "redirect") Problem = "Переход на другой адрес заблокирован. Повтори поиск в управляемой вкладке.";
+                if (Failure == "redirect") Problem = "Переход на другой адрес заблокирован. Повторите поиск в управляемой вкладке.";
                 return JsonSerializer.SerializeToElement(new { });
             }
             Assert.Equal("Runtime.evaluate", method);

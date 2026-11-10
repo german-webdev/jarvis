@@ -11,7 +11,7 @@ public static class TargetLauncher
         token.ThrowIfCancellationRequested();
         if (!target.Enabled || !target.IsValid) return Task.FromResult(new SkillResult(false, "Запись мультимедиа выключена или неверно настроена."));
         var path = target.Kind == "media-folder" ? target.Target : Path.GetDirectoryName(target.Target)!;
-        if (!Directory.Exists(path)) return Task.FromResult(new SkillResult(false, "Папка мультимедиа недоступна. Проверь путь или подключение диска."));
+        if (!Directory.Exists(path)) return Task.FromResult(new SkillResult(false, "Папка мультимедиа недоступна. Проверьте путь или подключение диска."));
         using var process = Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
         return Task.FromResult(new SkillResult(false, $"Открываю папку: {target.Name}."));
     }
@@ -24,12 +24,12 @@ public static class TargetLauncher
         ProcessStartInfo start;
         if (target.Kind is "exe" or "shortcut" or "audio" or "video")
         {
-            if (!File.Exists(target.Target)) return Task.FromResult(new SkillResult(false, "Файл приложения не найден. Обнови его запись в каталоге."));
+            if (!File.Exists(target.Target)) return Task.FromResult(new SkillResult(false, "Файл приложения не найден. Обновите его запись в каталоге."));
             start = new(target.Target) { UseShellExecute = true, WorkingDirectory = Path.GetDirectoryName(target.Target)! };
         }
         else if (target.Kind == "steam")
         {
-            if (!AppDiscovery.IsSteamInstalled(target.Target)) return Task.FromResult(new SkillResult(false, "Эта игра больше не найдена среди установленных игр Steam. Обнови каталог."));
+            if (!AppDiscovery.IsSteamInstalled(target.Target)) return Task.FromResult(new SkillResult(false, "Эта игра больше не найдена среди установленных игр Steam. Обновите каталог."));
             start = new("steam://rungameid/" + target.Target) { UseShellExecute = true };
         }
         else start = new(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe"))

@@ -36,16 +36,16 @@ public sealed class LaunchConversation
             _intent = request.CandidateIntent ?? Intent.LaunchTarget;
             var source = _intent is Intent.CloseTarget or Intent.FocusTarget ? running ?? [] : targets;
             var candidates = request.CandidateIds.Select(id => source.Single(t => t.Id == id)).ToArray();
-            if (candidates.Length > 6) return new(new(Intent.Unknown, Explanation: $"Нашёл {candidates.Length} совпадений. Назови игру точнее, например с номером части."));
+            if (candidates.Length > 6) return new(new(Intent.Unknown, Explanation: $"Нашёл {candidates.Length} совпадений. Назовите игру точнее, например с номером части."));
             _ids = candidates.Select(t => t.Id).ToArray(); Renew(now);
             return new(null, Question(candidates));
         }
         if (!HasPending) return new(request);
-        if (now >= _expires) { Clear(); return new(new(Intent.Unknown, Explanation: "Время выбора истекло. Повтори команду.")); }
+        if (now >= _expires) { Clear(); return new(new(Intent.Unknown, Explanation: "Время выбора истекло. Повторите команду.")); }
         var current = ChoosingWindow ? running ?? [] : targets;
         var options = _ids.Select(id => current.FirstOrDefault(t => t.Enabled && t.Id == id)).ToArray();
         // Do not shift positional choices if an entry disappeared or was disabled.
-        if (options.Any(t => t == null)) { Clear(); return new(new(Intent.Unknown, Explanation: "Список приложений изменился. Повтори команду.")); }
+        if (options.Any(t => t == null)) { Clear(); return new(new(Intent.Unknown, Explanation: "Список приложений изменился. Повторите команду.")); }
         var available = options.Select(t => t!).ToArray();
         LaunchTarget[] matches = [];
         if (!text.Contains('?') && !Regex.IsMatch(text, @"[-−]\s*\d"))
@@ -61,9 +61,9 @@ public sealed class LaunchConversation
             else matches = available.Where(t => t.Names.Any(n => CommandRouter.Normalize(n) == answer)).ToArray();
         }
         if (matches.Length == 1) { var action = _intent; Clear(); return new(new(action, matches[0].Id)); }
-        if (++_retries >= 2) { Clear(); return new(new(Intent.Unknown, Explanation: "Выбор не понял. Действие отменено; повтори команду с полным названием.")); }
+        if (++_retries >= 2) { Clear(); return new(new(Intent.Unknown, Explanation: "Выбор не понял. Действие отменено; повторите команду с полным названием.")); }
         Renew(now);
-        return new(null, "Уточни выбор. " + Question(available));
+        return new(null, "Уточните выбор. " + Question(available));
     }
     private string Question(IReadOnlyList<LaunchTarget> targets)
     {
@@ -77,6 +77,6 @@ public sealed class LaunchConversation
             return $"Вариант {i + 1}: {label}.";
         });
         var question = _intent switch { Intent.StartMusic => "Где включить музыку? ", Intent.CloseTarget => "Что закрыть? ", Intent.FocusTarget => "На какое окно переключиться? ", Intent.OpenTargetFolder => "Папку какой программы открыть? ", _ => "Что запустить? " };
-        return question + string.Join(" ", choices) + " Назови часть, полное название или номер варианта. Для отмены скажи: отмена.";
+        return question + string.Join(" ", choices) + " Назовите часть, полное название или номер варианта. Для отмены скажите: отмена.";
     }
 }

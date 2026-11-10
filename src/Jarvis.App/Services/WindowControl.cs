@@ -80,7 +80,7 @@ public sealed class WindowControl : ILocalActionWindows
         token.ThrowIfCancellationRequested();
         Entry? entry = request.TargetId != null ? _entries.GetValueOrDefault(request.TargetId)
             : _entries.Values.FirstOrDefault(e => e.Handle == GetForegroundWindow());
-        if (entry == null || !Current(entry)) return new(false, "Подходящего открытого окна не нашёл. Назови приложение или переключись на нужное окно.");
+        if (entry == null || !Current(entry)) return new(false, "Подходящего открытого окна не нашёл. Назовите приложение или переключитесь на нужное окно.");
         if (request.Intent is Intent.CloseTarget or Intent.CloseWindow)
         {
             if (!PostMessage(entry.Handle, 0x0010, 0, 0)) return new(false, "Windows не разрешила закрыть это окно.");
@@ -106,7 +106,7 @@ public sealed class WindowControl : ILocalActionWindows
             if (GetForegroundWindow() != entry.Handle && Current(entry))
                 await WindowFocus.TryAsync(entry.Handle, entry.Pid, entry.Started, token);
             return GetForegroundWindow() == entry.Handle ? new(true, $"Переключился на {entry.Target.Name}.")
-                : new(false, "Windows не разрешила перевести окно на передний план. Выбери его на панели задач.");
+                : new(false, "Windows не разрешила перевести окно на передний план. Выберите его на панели задач.");
         }
         return new(false, "Действие с окном не поддерживается.");
     }

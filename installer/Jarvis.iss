@@ -5,7 +5,7 @@
   #error ReleaseDir is required
 #endif
 #ifndef AppVersion
-  #define AppVersion "0.18.1"
+  #define AppVersion "0.18.2"
 #endif
 [Setup]
 #ifdef TestInstall
